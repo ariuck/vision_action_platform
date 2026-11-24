@@ -73,6 +73,27 @@ def select(augs: list[str]) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
+SEEDS = [42, 7, 123]
+
+
+def evaluate_seeds(make_model, augs: list[str]) -> dict:
+    """Random Forest는 무작위로 나무를 만들어서, 데이터 순서만 바뀌어도 1~2%p 달라진다. 3번 돌려 평균."""
+    runs = []
+    for sd in SEEDS:
+        def mk(sd=sd):
+            m = make_model()
+            for est in ([m] + [e for _, e in getattr(m, "estimators", [])] + list(getattr(m, "named_steps", {}).values())):
+                if hasattr(est, "random_state"):
+                    est.set_params(random_state=sd)
+            return m
+        runs.append(evaluate(mk, augs))
+    out = {k: float(np.mean([r[k] for r in runs])) for k in runs[0] if k not in ("per_action", "ext_detail")}
+    out["loso_std_seed"] = float(np.std([r["loso_acc"] for r in runs]))
+    out["per_action"] = pd.DataFrame([r["per_action"] for r in runs]).mean().to_dict()
+    out["ext_detail"] = runs[0]["ext_detail"]
+    return out
+
+
 def evaluate(make_model, augs: list[str]) -> dict:
     data = select(augs)
     orig = train_df[train_df.aug == "orig"]
@@ -148,6 +169,24 @@ def main():
         df, pa, det = show(res, "model_compare")
         print("\n동작별 LOSO:\n" + pa.to_string())
         print("\n외부 영상 예측:\n" + det.to_string())
+    elif stage == "aug3":   # 상위 후보를 무작위 시드 3개로 다시 비교
+        configs = {
+            "A0 지금": ["orig", "hflipT02"],
+            "A1 반전 전부": ["orig", "hflip"],
+            "A2 A1+속도": ["orig", "hflip", "fast", "slow"],
+            "A3 A1+잡음": ["orig", "hflip", "jitter"],
+            "A4 A1+기울임": ["orig", "hflip", "rot+", "rot-"],
+            "A8 A4+잡음": ["orig", "hflip", "rot+", "rot-", "jitter"],
+            "A9 A4+속도": ["orig", "hflip", "rot+", "rot-", "fast", "slow"],
+            "A6 전부": ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad"],
+        }
+        res = {}
+        for k, augs in configs.items():
+            res[k] = evaluate_seeds(MODELS["RF (지금)"], augs)
+            print(f"{k}: LOSO {res[k]['loso_acc']:.3f} (±{res[k]['loso_std_seed']:.3f}) 외부 {res[k]['ext_acc']:.2f}"
+                  f"  ({time.time() - t0:.0f}s)", flush=True)
+        df, pa, det = show(res, "aug_compare_3seeds")
+        print("\n동작별 LOSO:\n" + pa.to_string())
 
 
 if __name__ == "__main__":

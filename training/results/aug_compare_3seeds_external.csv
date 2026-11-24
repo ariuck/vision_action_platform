@@ -1,0 +1,11 @@
+﻿,정답,A0 지금,A1 반전 전부,A2 A1+속도,A3 A1+잡음,A4 A1+기울임,A8 A4+잡음,A9 A4+속도,A6 전부
+ext_push,push,grab_shake,grab_shake,push,grab_shake,grab_shake,grab_shake,grab_shake,grab_shake
+ext_grab_shake,grab_shake,push,push,push,push,push,push,push,push
+ext_kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap,kiosk_tap
+ext_crouch_take_item,crouch_take_item,fall_forward,fall_forward,fall_forward,fall_forward,fall_forward,fall_forward,fall_forward,fall_forward
+ext_lie_forward,lie_forward,fall_sideways,fall_sideways,fall_sideways,fall_sideways,fall_sideways,fall_sideways,fall_sideways,fall_sideways
+job15_dc9bace0,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick
+job16_c1ffdbb5,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick
+job17_b271e0b5,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick
+job18_faaa48ea,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick
+job24_d4d6c284,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick,front_kick
