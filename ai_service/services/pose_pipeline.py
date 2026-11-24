@@ -22,6 +22,7 @@ import pandas as pd
 
 from src.feature_utils import normalize_by_shoulder_width, selected_joint_angles
 from src.sequence_utils import flatten_sequence, resample_sequence
+from src.summary_features import summary_features
 from src.team_features import torso_length, torso_tilt_deg
 
 from .track_quality import find_segment, motion_curve
@@ -125,7 +126,8 @@ def track_to_frames(track: Track) -> pd.DataFrame:
 
 
 def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frames: int,
-                   segment_only: bool = False, segment_floor: float = 0.0):
+                   segment_only: bool = False, segment_floor: float = 0.0,
+                   summary_names: list[str] | None = None):
     """한 사람의 Frame들 → (1,350 Feature, 사용한 Frame 수, 사용한 구간). 입력을 만들 수 없으면 (None, 사유, None).
 
     segment_only=True면 학습 때처럼 움직임이 큰 동작 구간만 남긴다.
@@ -183,4 +185,7 @@ def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frame
     if not np.all(np.isfinite(matrix)):
         return None, "팀 Feature를 계산할 수 없는 Frame이 있습니다 (사람이 너무 짧게 보였을 수 있음).", None
     vector = flatten_sequence(resample_sequence(matrix, np.asarray(base_ids), target_steps=steps))
+    if summary_names is not None:
+        # 결정적인 순간 특징: 동작 구간 안 Frame들의 최대·최소·평균·표준편차 + 가장 크게 움직인 순간 (학습과 같은 순서)
+        vector = np.concatenate([vector, summary_features(matrix, summary_names)])
     return vector, len(base_rows), segment

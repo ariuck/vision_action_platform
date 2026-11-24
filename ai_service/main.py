@@ -41,6 +41,8 @@ def health():
         "sequence_steps": bundle.sequence_steps,
         "train_clips": bundle.training_info.get("train_clips"),
         "segment_only": bool(bundle.training_info.get("segment_only")),
+        "segment_floor": float(bundle.training_info.get("segment_floor", 0.0)),
+        "summary_features": bundle.summary_count,
         "pose_model": bundle.project_config["pose_model"],
         "device": bundle.device,
         "uncertain_below": UNCERTAIN_BELOW,

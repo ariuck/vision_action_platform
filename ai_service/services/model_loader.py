@@ -40,8 +40,18 @@ class ModelBundle:
         return int(self.training_info["sequence_steps"])
 
     @property
+    def summary_count(self) -> int:
+        """결정적인 순간 특징 수 (없는 예전 모델은 0)"""
+        return int(self.training_info.get("summary_feature_count", 0)) if self.training_info.get("summary_features") else 0
+
+    @property
     def frame_feature_count(self) -> int:
-        return len(self.feature_columns) // self.sequence_steps
+        return (len(self.feature_columns) - self.summary_count) // self.sequence_steps
+
+    @property
+    def frame_feature_names(self) -> list[str]:
+        """Frame 특징 45개 이름 (학습 때 순서). 결정적인 순간 특징 계산에 쓴다."""
+        return [c.split("_", 1)[1] for c in self.feature_columns[: self.frame_feature_count]]
 
     @property
     def classes(self) -> list[str]:
@@ -72,8 +82,11 @@ def load_bundle() -> ModelBundle:
         raise RuntimeError("Feature 순서 파일과 학습 정보의 Feature 수가 다릅니다.")
     if getattr(model, "n_features_in_", len(feature_columns)) != len(feature_columns):
         raise RuntimeError("모델 입력 Feature 수가 Feature 순서 파일과 다릅니다.")
-    if len(feature_columns) % steps:
-        raise RuntimeError("Feature 수가 sequence_steps로 나누어떨어지지 않습니다.")
+    summary = int(training_info.get("summary_feature_count", 0)) if training_info.get("summary_features") else 0
+    if (len(feature_columns) - summary) % steps:
+        raise RuntimeError("시간표 Feature 수가 sequence_steps로 나누어떨어지지 않습니다.")
+    if summary and not all(c.startswith(("sum_", "peak_")) for c in feature_columns[-summary:]):
+        raise RuntimeError("결정적인 순간 특징 이름이 Feature 순서 파일 끝에 없습니다.")
     missing = [c for c in model.classes_ if c not in actions]
     if missing:
         raise RuntimeError(f"동작표에 없는 Class: {missing}")

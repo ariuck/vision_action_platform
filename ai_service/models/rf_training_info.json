@@ -26,7 +26,7 @@
     "throw_one_hand",
     "vomit"
   ],
-  "feature_count": 1350,
+  "feature_count": 1575,
   "sequence_steps": 30,
   "min_valid_frames": 10,
   "n_estimators": 300,
@@ -53,5 +53,7 @@
   "augmented_clips": 85,
   "action_classes_csv": "configs/team03_action_classes.csv",
   "segment_only": true,
-  "segment_floor": 0.4
+  "segment_floor": 0.4,
+  "summary_features": true,
+  "summary_feature_count": 225
 }
