@@ -7,6 +7,9 @@ import time
 import numpy as np
 
 from services.pose_pipeline import track_features, track_to_frames, track_video
+from services.track_quality import measure
+
+NO_ACTION_LABEL = "no_action"
 
 # 이 값보다 Confidence가 낮으면 화면에 '판단 불확실'로 표시한다.
 # 17개 동작이라 표가 나뉘어 Confidence가 원래 낮게 나온다 (5명 교차 평가 평균 약 0.33).
@@ -28,33 +31,52 @@ def predict_video(path: str, bundle) -> dict:
         if seen_sec < MIN_TRACK_SEC:
             skipped.append({"track_id": tid, "reason": f"{seen_sec:.2f}초만 보여 예측하지 않았습니다."})
             continue
-        vector, used = track_features(track_to_frames(track), info.fps, steps, min_valid)
+        frames = track_to_frames(track)
+        # 모델이 동작 구간만으로 학습됐으면 예측할 때도 같은 규칙으로 잘라서 넣는다
+        vector, used, segment = track_features(frames, info.fps, steps, min_valid,
+                                               segment_only=bool(bundle.training_info.get("segment_only")))
         if vector is None:
             skipped.append({"track_id": tid, "reason": used})
             continue
+        quality = measure(frames, info.fps, info.width, info.height)
         proba = bundle.model.predict_proba(vector.reshape(1, -1))[0]
         order = np.argsort(proba)[::-1]
-        top = classes[order[0]]
-        action = bundle.actions[top]
-        conf = float(proba[order[0]])
+        top3 = [{"action_label": str(classes[j]), "action_name": bundle.actions[classes[j]]["action_name"],
+                 "confidence": round(float(proba[j]), 4)} for j in order[:3]]
+        if quality["no_action"]:
+            # 거의 안 움직였으면 17개 중 억지로 고르지 않는다 (모델 후보는 참고용으로만 남김)
+            result = {"action_id": "-", "action_label": NO_ACTION_LABEL, "action_name": "동작 없음(정상)",
+                      "action_group": "", "confidence": 0.0, "uncertain": False}
+        else:
+            top = classes[order[0]]
+            action = bundle.actions[top]
+            conf = float(proba[order[0]])
+            result = {"action_id": action["action_id"], "action_label": top, "action_name": action["action_name"],
+                      "action_group": action.get("group", ""), "confidence": round(conf, 4),
+                      "uncertain": conf < UNCERTAIN_BELOW}
         predictions.append({
-            "track_id": tid,
-            "action_id": action["action_id"],
-            "action_label": top,
-            "action_name": action["action_name"],
-            "action_group": action.get("group", ""),
-            "confidence": round(conf, 4),
-            "uncertain": conf < UNCERTAIN_BELOW,
-            "top3": [{"action_label": str(classes[j]), "action_name": bundle.actions[classes[j]]["action_name"],
-                      "confidence": round(float(proba[j]), 4)} for j in order[:3]],
+            "track_id": tid, **result, "top3": top3,
+            "no_action": quality["no_action"],
+            "is_main": quality["is_main"],
+            "motion_level": quality["motion_level"],
+            "height_ratio": quality["height_ratio"],
             "frames": len(track.frame_ids),
             "valid_frames": int(used),
             "first_sec": round(track.frame_ids[0] / info.fps, 3),
             "last_sec": round(track.frame_ids[-1] / info.fps, 3),
+            # 실제로 모델에 넣은 동작 구간 (구간 자르기를 안 쓰면 None)
+            "action_start_sec": round(segment[0] / info.fps, 3) if segment else None,
+            "action_end_sec": round(segment[1] / info.fps, 3) if segment else None,
         })
 
+    main = [p for p in predictions if p["is_main"]]
     if predictions:
-        status, message = "ok", f"{len(predictions)}명의 동작을 예측했습니다."
+        status = "ok"
+        message = f"{len(main)}명의 동작을 예측했습니다."
+        if len(predictions) > len(main):
+            message += f" (배경 인물 {len(predictions) - len(main)}명 제외)"
+        if not main:
+            message = "화면 앞쪽에서 몸 전체가 보이는 사람이 없습니다. 카메라 위치를 확인하세요."
     elif tracks:
         status, message = "no_prediction", "사람은 찾았지만 예측에 필요한 만큼 관절이 잡히지 않았습니다."
     else:

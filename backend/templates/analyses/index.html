@@ -105,7 +105,11 @@
         <td><span class="badge {{ job.status|lower }}">{{ job.get_status_display }}</span></td>
         <td>
           {% for p in job.predictions.all %}
-            <div>ID {{ p.track_id }} · {{ p.action_name }} · {% widthratio p.confidence 1 100 %}%{% if p.uncertain %} <span class="badge warn">판단 불확실</span>{% endif %}</div>
+            {% if p.is_main %}
+              <div>ID {{ p.track_id }} · {{ p.action_name }}{% if not p.no_action %} · {% widthratio p.confidence 1 100 %}%{% endif %}{% if p.uncertain %} <span class="badge warn">판단 불확실</span>{% endif %}</div>
+            {% else %}
+              <div><small class="muted">배경 ID {{ p.track_id }}</small></div>
+            {% endif %}
           {% empty %}
             {% if job.status == "FAILURE" %}<span class="error">{{ job.error_message|truncatechars:60 }}</span>{% elif job.status == "SUCCESS" %}{{ job.message }}{% else %}-{% endif %}
           {% endfor %}

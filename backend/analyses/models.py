@@ -93,6 +93,10 @@ class PersonPrediction(models.Model):
     action_name = models.CharField(max_length=40)
     confidence = models.FloatField()
     uncertain = models.BooleanField("판단 불확실", default=False)
+    no_action = models.BooleanField("동작 없음", default=False)        # 거의 안 움직여서 예측하지 않음
+    is_main = models.BooleanField("주인공", default=True)              # False = 배경 인물(화면 끝·다리 가려짐 등)
+    motion_level = models.FloatField("움직임 크기", null=True, blank=True)
+    height_ratio = models.FloatField("키/화면 높이", null=True, blank=True)
     top3 = models.JSONField(default=list, blank=True)
     frames = models.IntegerField("보인 Frame 수", default=0)
     valid_frames = models.IntegerField("예측에 쓴 Frame 수", default=0)

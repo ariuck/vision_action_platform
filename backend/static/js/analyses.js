@@ -231,14 +231,23 @@
       box.innerHTML = `<p>${esc(job.message || "예측 결과가 없습니다.")}</p>`;
       return;
     }
-    const rows = job.predictions.map((p) => `
+    const row = (p) => `
       <tr><td class="center">${p.track_id}</td>
-      <td><strong>${esc(p.action_name)}</strong><br><small class="muted">${esc(p.action_id)} ${esc(p.action_label)} · ${p.first_sec}~${p.last_sec}초</small></td>
-      <td class="center"><strong>${Math.round(p.confidence * 100)}%</strong>${p.uncertain ? '<br><span class="badge warn">판단 불확실</span>' : ""}</td></tr>
-      <tr class="sub"><td></td><td colspan="2"><small class="muted">후보: ${p.top3.map((t) => `${esc(t.action_name)} ${Math.round(t.confidence * 100)}%`).join(" · ")}</small></td></tr>`).join("");
+      <td><strong>${esc(p.action_name)}</strong><br><small class="muted">${p.no_action ? "움직임이 거의 없어 예측하지 않음" : `${esc(p.action_id)} ${esc(p.action_label)}`} · ${p.first_sec}~${p.last_sec}초</small></td>
+      <td class="center">${p.no_action ? '<span class="badge">정상</span>' : `<strong>${Math.round(p.confidence * 100)}%</strong>`}${p.uncertain ? '<br><span class="badge warn">판단 불확실</span>' : ""}</td></tr>
+      <tr class="sub"><td></td><td colspan="2"><small class="muted">${p.no_action ? "참고 후보" : "후보"}: ${p.top3.map((t) => `${esc(t.action_name)} ${Math.round(t.confidence * 100)}%`).join(" · ")}</small></td></tr>`;
+    const main = job.predictions.filter((p) => p.is_main);
+    const bg = job.predictions.filter((p) => !p.is_main);
+    const head = `<thead><tr><th>Track ID</th><th>예측 동작</th><th>신뢰도</th></tr></thead>`;
+    const mainTable = main.length
+      ? `<div class="table-wrap"><table class="table result-table">${head}<tbody>${main.map(row).join("")}</tbody></table></div>`
+      : `<p class="muted">화면 앞쪽에서 몸 전체가 보이는 사람이 없습니다.</p>`;
+    const bgTable = bg.length
+      ? `<details class="bg-people"><summary>배경 인물 ${bg.length}명 (화면 끝에 걸치거나 다리가 가려져 결과에서 제외)</summary>
+         <div class="table-wrap"><table class="table result-table">${head}<tbody>${bg.map(row).join("")}</tbody></table></div></details>`
+      : "";
     const expected = job.expected_action ? `<p class="muted">수행한 동작(직접 선택): ${esc(job.expected_action_display)}</p>` : "";
-    box.innerHTML = `<div class="table-wrap"><table class="table result-table"><thead><tr><th>Track ID</th><th>예측 동작</th><th>신뢰도</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>${expected}
+    box.innerHTML = `${mainTable}${bgTable}${expected}
       <p class="muted">영상 ${job.video_duration_sec ?? "-"}초 · AI 추론 ${job.ai_processing_sec ?? "-"}초 · 전체 ${job.total_processing_sec ?? "-"}초</p>`;
   }
 
@@ -306,7 +315,9 @@
   // ---------------- 최근 이력 ----------------
   function historyRow(j) {
     const result = j.predictions.length
-      ? j.predictions.map((p) => `<div>ID ${p.track_id} · ${esc(p.action_name)} · ${Math.round(p.confidence * 100)}%${p.uncertain ? ' <span class="badge warn">판단 불확실</span>' : ""}</div>`).join("")
+      ? j.predictions.map((p) => p.is_main
+          ? `<div>ID ${p.track_id} · ${esc(p.action_name)}${p.no_action ? "" : ` · ${Math.round(p.confidence * 100)}%`}${p.uncertain ? ' <span class="badge warn">판단 불확실</span>' : ""}</div>`
+          : `<div><small class="muted">배경 ID ${p.track_id}</small></div>`).join("")
       : j.status === "FAILURE" ? `<span class="error">${esc((j.error_message || "").slice(0, 60))}</span>`
         : j.status === "SUCCESS" ? esc(j.message) : "-";
     return `<tr><td>${j.id}</td><td>${esc(j.input_type_display)}</td>

@@ -42,13 +42,14 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--train-repo", required=True)
     p.add_argument("--clips", type=int, default=12)
+    p.add_argument("--segment", action="store_true", help="동작 구간만 쓰는 모델과 비교")
     args = p.parse_args()
     repo = Path(args.train_repo).expanduser()
     sys.path.append(str(repo / "scripts" / "team03"))
     import team_day06_baseline as tb  # noqa: E402  (학습 코드)
 
     config = tb.load_config()
-    cond = tb.CONDITIONS["team_45d"]
+    cond = {"team_features": True, "segment_only": True} if args.segment else tb.CONDITIONS["team_45d"]
     split = pd.read_csv(repo / "data/team_projects/team03/splits/test.csv")
     sample = split.groupby("take").head(max(1, args.clips // 3)).head(args.clips)
     cols = json.loads((BASE / "models" / "rf_feature_columns.json").read_text())
@@ -66,10 +67,11 @@ def main() -> None:
             tb.SPLIT_DIR = old
         ref_vec = ref[cols].to_numpy(float)[0]
         track, fps = track_from_keypoint_csv(repo / item.keypoint_csv)
-        vec, used = track_features(track_to_frames(track), fps, 30, int(config["min_valid_frames"]))
+        vec, used, seg = track_features(track_to_frames(track), fps, 30, int(config["min_valid_frames"]),
+                                        segment_only=args.segment)
         diff = float(np.max(np.abs(vec - ref_vec)))
         worst = max(worst, diff)
-        print(f"{item.clip_id}  frames={used:4d}  max|diff|={diff:.6f}")
+        print(f"{item.clip_id}  frames={used:4d}  segment={seg}  max|diff|={diff:.6f}")
     print(f"\n최대 차이: {worst:.6f}  →  {'같음 (반올림 수준)' if worst < 1e-3 else '다름 — 계산 확인 필요'}")
 
 

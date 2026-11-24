@@ -85,6 +85,8 @@ form.inline { display: inline; }
 .result-table th { background: #eef2ff; text-align: center; }
 .result-table tr.sub td { border-top: 0; padding-top: 0; }
 .center { text-align: center; }
+.bg-people { margin: 8px 0; color: var(--muted); font-size: 13px; }
+.bg-people summary { cursor: pointer; }
 .nowrap { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 .table-wrap .table { min-width: 640px; }

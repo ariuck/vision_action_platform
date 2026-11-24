@@ -26,7 +26,8 @@ FAKE_RESULT = {
          "confidence": 0.72, "uncertain": False, "frames": 90, "valid_frames": 88, "first_sec": 0.0,
          "last_sec": 3.0, "top3": [{"action_label": "sit_floor", "action_name": "바닥에 앉기", "confidence": 0.72}]},
         {"track_id": 2, "action_id": "A016", "action_label": "fall_backward", "action_name": "뒤로 넘어지기",
-         "confidence": 0.15, "uncertain": True, "frames": 40, "valid_frames": 35, "first_sec": 1.0,
+         "confidence": 0.15, "uncertain": True, "is_main": False, "no_action": False,
+         "motion_level": 0.63, "height_ratio": 0.41, "frames": 40, "valid_frames": 35, "first_sec": 1.0,
          "last_sec": 2.3, "top3": []},
     ],
 }
@@ -161,6 +162,9 @@ class RunAnalysisTaskTests(TestCase):
         self.assertEqual((self.job.status, self.job.stage), ("SUCCESS", "DONE"))
         self.assertEqual(self.job.predictions.count(), 2)
         self.assertTrue(self.job.predictions.get(track_id=2).uncertain)
+        # 배경 인물 표시가 저장되고, 예전 응답처럼 값이 없으면 주인공으로 본다
+        self.assertFalse(self.job.predictions.get(track_id=2).is_main)
+        self.assertTrue(self.job.predictions.get(track_id=1).is_main)
         self.assertEqual(self.job.video_frames, 90)
 
     @mock.patch("analyses.tasks.request_prediction", side_effect=AIServiceError("AI_UNREACHABLE", "연결 실패"))

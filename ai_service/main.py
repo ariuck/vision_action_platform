@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from routers.predictions import router as prediction_router
 from services.action_inference import UNCERTAIN_BELOW
+from services import track_quality as tq
 from services.model_loader import load_bundle
 
 
@@ -42,4 +43,7 @@ def health():
         "pose_model": bundle.project_config["pose_model"],
         "device": bundle.device,
         "uncertain_below": UNCERTAIN_BELOW,
+        "no_action_motion": tq.NO_ACTION_MOTION,
+        "main_person": {"min_height": tq.MAIN_MIN_HEIGHT, "min_sec": tq.MAIN_MIN_SEC,
+                        "max_edge": tq.MAIN_MAX_EDGE, "min_legs": tq.MAIN_MIN_LEGS},
     }

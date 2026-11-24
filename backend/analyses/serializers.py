@@ -16,8 +16,8 @@ ALLOWED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 class PersonPredictionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PersonPrediction
-        fields = ["track_id", "action_id", "action_label", "action_name", "confidence", "uncertain", "top3",
-                  "frames", "valid_frames", "first_sec", "last_sec"]
+        fields = ["track_id", "action_id", "action_label", "action_name", "confidence", "uncertain", "no_action",
+                  "is_main", "motion_level", "height_ratio", "top3", "frames", "valid_frames", "first_sec", "last_sec"]
 
 
 class AnalysisJobSerializer(serializers.ModelSerializer):

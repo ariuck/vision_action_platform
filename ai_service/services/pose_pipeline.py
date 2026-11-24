@@ -24,6 +24,8 @@ from src.feature_utils import normalize_by_shoulder_width, selected_joint_angles
 from src.sequence_utils import flatten_sequence, resample_sequence
 from src.team_features import torso_length, torso_tilt_deg
 
+from .track_quality import find_segment, motion_curve
+
 LAG_SEC = 0.1
 TEAM_FEATURES = ["torso_tilt_deg", "bbox_aspect_ratio", "hip_floor_height",
                  "left_ankle_speed", "right_ankle_speed", "left_wrist_speed", "right_wrist_speed"]
@@ -115,8 +117,13 @@ def track_to_frames(track: Track) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frames: int):
-    """한 사람의 Frame들 → (1,350 Feature, 사용한 Frame 수). 입력을 만들 수 없으면 (None, 사유)."""
+def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frames: int,
+                   segment_only: bool = False):
+    """한 사람의 Frame들 → (1,350 Feature, 사용한 Frame 수, 사용한 구간). 입력을 만들 수 없으면 (None, 사유, None).
+
+    segment_only=True면 학습 때처럼 움직임이 큰 동작 구간만 남긴다.
+    (속도 Feature는 구간을 자르기 전에 전체 Frame으로 계산한 뒤 고른다 — 학습 코드와 같은 순서)
+    """
     lag = max(1, round(LAG_SEC * fps))
     pose = frames["pose_ok"].to_numpy(bool)
     kps = list(frames["kp"])
@@ -149,14 +156,24 @@ def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frame
             if i >= lag and pose[i - lag] and torso_clip > 1e-8:
                 team[name][i] = float(np.linalg.norm(k[j] - kps[i - lag][j])) / torso_clip / (lag / fps)
 
-    if len(base_rows) < min_valid_frames:
-        return None, f"관절이 제대로 잡힌 Frame이 {len(base_rows)}개뿐입니다 (최소 {min_valid_frames}개)."
-
     team_df = pd.DataFrame(team, index=frames["frame_id"].to_numpy())
     team_df = team_df.where(np.isfinite(team_df)).interpolate(limit_direction="both")
+
+    segment = None
+    if segment_only:
+        s_idx, e_idx = find_segment(motion_curve(frames, fps), fps)
+        f0, f1 = int(frames["frame_id"].iloc[s_idx]), int(frames["frame_id"].iloc[e_idx])
+        keep = [i for i, f in enumerate(base_ids) if f0 <= f <= f1]
+        base_rows = [base_rows[i] for i in keep]
+        base_ids = [base_ids[i] for i in keep]
+        segment = (f0, f1)
+
+    if len(base_rows) < min_valid_frames:
+        return None, f"관절이 제대로 잡힌 Frame이 {len(base_rows)}개뿐입니다 (최소 {min_valid_frames}개).", None
+
     extra = team_df.loc[base_ids].to_numpy(np.float32)
     matrix = np.hstack([np.asarray(base_rows, dtype=np.float32), extra])
     if not np.all(np.isfinite(matrix)):
-        return None, "팀 Feature를 계산할 수 없는 Frame이 있습니다 (사람이 너무 짧게 보였을 수 있음)."
+        return None, "팀 Feature를 계산할 수 없는 Frame이 있습니다 (사람이 너무 짧게 보였을 수 있음).", None
     vector = flatten_sequence(resample_sequence(matrix, np.asarray(base_ids), target_steps=steps))
-    return vector, len(base_rows)
+    return vector, len(base_rows), segment

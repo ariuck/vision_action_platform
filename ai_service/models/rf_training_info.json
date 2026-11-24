@@ -32,7 +32,7 @@
   "n_estimators": 300,
   "max_depth": null,
   "random_state": 42,
-  "condition": "team_45d",
+  "condition": "team_45d_segment",
   "frame_feature_count": 45,
   "team_features": [
     "torso_tilt_deg",
@@ -51,5 +51,6 @@
   ],
   "augmentation": "hflip of T02 (side) train clips",
   "augmented_clips": 85,
-  "action_classes_csv": "configs/team03_action_classes.csv"
+  "action_classes_csv": "configs/team03_action_classes.csv",
+  "segment_only": true
 }

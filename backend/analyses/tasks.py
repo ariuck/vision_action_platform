@@ -84,6 +84,8 @@ def run_analysis(self, job_id: int) -> str:
             PersonPrediction(
                 job=job, track_id=p["track_id"], action_id=p["action_id"], action_label=p["action_label"],
                 action_name=p["action_name"], confidence=p["confidence"], uncertain=p["uncertain"],
+                no_action=p.get("no_action", False), is_main=p.get("is_main", True),
+                motion_level=p.get("motion_level"), height_ratio=p.get("height_ratio"),
                 top3=p.get("top3", []), frames=p.get("frames", 0), valid_frames=p.get("valid_frames", 0),
                 first_sec=p.get("first_sec"), last_sec=p.get("last_sec"))
             for p in result.get("predictions", [])

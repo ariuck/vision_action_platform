@@ -24,7 +24,9 @@ def index(request):
 @staff_member_required
 def dashboard(request):
     # 차트 숫자는 Django ORM 집계로 만든다 (FastAPI는 DB에 접근하지 않음).
-    by_action = dict(PersonPrediction.objects.values_list("action_label").annotate(n=Count("id")))
+    # 배경 인물은 빼고 주인공 예측만 센다
+    by_action = dict(PersonPrediction.objects.filter(is_main=True, no_action=False)
+                     .values_list("action_label").annotate(n=Count("id")))
     by_status = dict(AnalysisJob.objects.values_list("status").annotate(n=Count("id")))
     by_input = dict(AnalysisJob.objects.values_list("input_type").annotate(n=Count("id")))
     avg_sec = dict(AnalysisJob.objects.filter(status=AnalysisJob.Status.SUCCESS)
@@ -43,5 +45,7 @@ def dashboard(request):
         "chart": chart, "recent": recent,
         "total_jobs": AnalysisJob.objects.count(),
         "total_predictions": PersonPrediction.objects.count(),
-        "uncertain": PersonPrediction.objects.filter(uncertain=True).count(),
+        "uncertain": PersonPrediction.objects.filter(uncertain=True, is_main=True).count(),
+        "no_action": PersonPrediction.objects.filter(no_action=True, is_main=True).count(),
+        "background": PersonPrediction.objects.filter(is_main=False).count(),
     })
