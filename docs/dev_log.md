@@ -30,3 +30,21 @@ FastAPI에 직접 보냈을 때와 같은 값이 나와서 Django → Celery →
 ## 4. 컨테이너에서 CSS가 안 나오는 문제 대비
 
 - DEBUG=0이면 Django가 static 파일을 주지 않는다. gunicorn으로 띄울 것이라 `whitenoise`를 넣고 이미지 빌드 때 `collectstatic`을 실행하게 했다.
+- 컨테이너로 띄운 뒤 `/static/css/app.css`가 200으로 나오는 것 확인.
+
+## 5. Docker Compose로 5개 컨테이너 실행
+
+- `docker compose up -d --build` 후 postgres, redis, fastapi, django, celery 모두 healthy.
+- 로컬에서는 확인용으로 Celery를 바로 실행(eager)했지만, 컨테이너에서는 실제로 Redis 대기열을 거친다. 업로드하면 바로 202와 PENDING이 오고, Worker가 처리한 뒤 SUCCESS로 바뀌었다.
+
+| 영상 | 예측 | Confidence | 전체 처리 시간 (CPU) |
+|---|---|---|---|
+| S05_A007_T01 | A007 바닥에 앉기 | 0.71 | 30.8초 |
+| S05_A016_T03 | A016 뒤로 넘어지기 | 0.81 | 21.7초 |
+
+- 컨테이너는 GPU 없이 CPU로 돌려서 로컬(GPU)보다 약 1.5배 느렸다. Confidence는 소수 둘째 자리에서 조금 다르지만 예측 동작은 같다.
+
+## 6. 재시작 후 데이터 유지
+
+- `docker compose down` → `docker compose up -d` 후에도 작업 2개, 예측 2개, 업로드 영상 경로가 그대로 남았다.
+- PostgreSQL 데이터와 업로드 영상을 이름 있는 볼륨(`postgres_data`, `media_data`)에 두었기 때문이다. `down -v`를 쓰면 볼륨까지 지워지니 주의.
