@@ -68,13 +68,17 @@ MIN_ACTIVE_SEC = 0.15  # 기준선을 이 시간 이상 넘어야 움직임으�
 PAD_SEC = 0.2          # 시작·끝 앞뒤 여유
 
 
-def find_segment(curve: np.ndarray, fps: float) -> tuple[int, int]:
-    """학습 때 동작 구간(team_action_segments.py find_segment)과 같은 규칙. Frame 위치(index) 시작·끝."""
+def find_segment(curve: np.ndarray, fps: float, floor: float = 0.0) -> tuple[int, int]:
+    """학습 때 동작 구간(team_action_segments.py find_main_segment, 묶는 간격 무한대)과 같은 규칙.
+
+    floor: 기준선 최소값. 서 있는 시간이 긴 카메라 영상에서 서 있을 때 흔들림까지 동작으로 잡히지 않게 한다.
+    모델 학습 정보(rf_training_info.json)의 segment_floor 값을 그대로 써야 학습과 같아진다.
+    """
     n = len(curve)
     if n == 0 or not np.isfinite(curve).any():
         return 0, max(0, n - 1)
     p5, p95 = np.nanpercentile(curve, [5, 95])
-    thr = p5 + THRESH_FRAC * (p95 - p5)
+    thr = max(p5 + THRESH_FRAC * (p95 - p5), floor)
     above = np.nan_to_num(curve, nan=0.0) > thr
     min_len = max(1, round(MIN_ACTIVE_SEC * fps))
     runs, start = [], None

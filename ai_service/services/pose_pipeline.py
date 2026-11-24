@@ -125,7 +125,7 @@ def track_to_frames(track: Track) -> pd.DataFrame:
 
 
 def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frames: int,
-                   segment_only: bool = False):
+                   segment_only: bool = False, segment_floor: float = 0.0):
     """한 사람의 Frame들 → (1,350 Feature, 사용한 Frame 수, 사용한 구간). 입력을 만들 수 없으면 (None, 사유, None).
 
     segment_only=True면 학습 때처럼 움직임이 큰 동작 구간만 남긴다.
@@ -168,7 +168,7 @@ def track_features(frames: pd.DataFrame, fps: float, steps: int, min_valid_frame
 
     segment = None
     if segment_only:
-        s_idx, e_idx = find_segment(motion_curve(frames, fps), fps)
+        s_idx, e_idx = find_segment(motion_curve(frames, fps), fps, segment_floor)
         f0, f1 = int(frames["frame_id"].iloc[s_idx]), int(frames["frame_id"].iloc[e_idx])
         keep = [i for i, f in enumerate(base_ids) if f0 <= f <= f1]
         base_rows = [base_rows[i] for i in keep]

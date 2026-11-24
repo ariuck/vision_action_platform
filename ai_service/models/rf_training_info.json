@@ -52,5 +52,6 @@
   "augmentation": "hflip of T02 (side) train clips",
   "augmented_clips": 85,
   "action_classes_csv": "configs/team03_action_classes.csv",
-  "segment_only": true
+  "segment_only": true,
+  "segment_floor": 0.4
 }

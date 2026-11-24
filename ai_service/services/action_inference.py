@@ -41,7 +41,8 @@ def predict_video(path: str, bundle) -> dict:
         frames = track_to_frames(track)
         # 모델이 동작 구간만으로 학습됐으면 예측할 때도 같은 규칙으로 잘라서 넣는다
         vector, used, segment = track_features(frames, info.fps, steps, min_valid,
-                                               segment_only=bool(bundle.training_info.get("segment_only")))
+                                               segment_only=bool(bundle.training_info.get("segment_only")),
+                                               segment_floor=float(bundle.training_info.get("segment_floor", 0.0)))
         if vector is None:
             skipped.append({"track_id": tid, "reason": used})
             continue
