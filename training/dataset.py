@@ -12,6 +12,7 @@
 - jitter  : 관절 좌표에 작은 잡음 (상체 길이의 2%) — 화질이 낮은 카메라 흉내
 - rot±    : 화면을 ±7도 기울임 — 카메라가 살짝 기울어진 경우
 - pad     : 앞뒤에 1.5~3초 서 있는 Frame 추가 (잡음 포함) — 카메라 녹화처럼 서 있는 시간이 긴 경우
+- fps30   : 한 Frame 건너 하나씩 → 30fps 영상 흉내 (학습 영상은 전부 60fps)
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ from src.pose_utils import COCO_KEYPOINT_NAMES  # noqa: E402
 TRAIN_REPO = Path.home() / "ai_vision/subject10_pose_action"
 MANIFEST = TRAIN_REPO / "data/team_projects/team03/manifests/keypoint_dataset_manifest.csv"
 FLIP_PAIRS = [(1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16)]
-AUGS = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad"]
+AUGS = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad", "fps30"]
 
 
 def track_from_csv(path: Path) -> tuple[Track, float]:
@@ -88,6 +89,12 @@ def augment(tr: Track, fps: float, kind: str, width: float, seed: int) -> tuple[
             corners = (np.array([[x1, y1], [x2, y1], [x1, y2], [x2, y2]]) - center) @ r.T + center
             t.boxes[i] = np.array([*corners.min(0), *corners.max(0)])
         return t, fps
+    if kind == "fps30":   # 60fps 학습 영상을 한 Frame 건너 하나씩 → 30fps 카메라·휴대폰 영상 흉내
+        new = Track(1)
+        for fid, k, c, b in zip(tr.frame_ids, tr.keypoints, tr.confidences, tr.boxes):
+            if fid % 2 == 0:
+                new.add(fid // 2, k, c, b)
+        return new, fps / 2
     if kind == "pad":   # 앞뒤로 서 있는 시간 추가 (첫·마지막 Frame + 작은 잡음)
         s = 0.01 * _torso(tr)
         n_before = int(rng.uniform(1.5, 3.0) * fps)

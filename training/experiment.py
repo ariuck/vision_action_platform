@@ -32,7 +32,10 @@ RESULTS.mkdir(exist_ok=True)
 SUBJECTS = ["S01", "S02", "S03", "S04", "S05"]
 
 train_df = pd.read_pickle(CACHE / "train_floor0.4.pkl")
-ext_df = pd.read_pickle(CACHE / "external_floor0.4.pkl")
+ext_all = pd.read_pickle(CACHE / "external_floor0.4.pkl")
+if "aug" not in ext_all.columns:
+    ext_all["aug"] = "orig"
+ext_df = ext_all[ext_all.aug == "orig"].reset_index(drop=True)
 FEATS = [c for c in train_df.columns if c.startswith("f") and c[1:].isdigit()]
 
 
@@ -46,6 +49,9 @@ MODELS = {
     "RF 500·특징10%": lambda: rf(n=500, max_features=0.1),
     "RF 500·잎2": lambda: rf(n=500, min_samples_leaf=2),
     "ExtraTrees 500": lambda: ExtraTreesClassifier(n_estimators=500, class_weight="balanced", random_state=42, n_jobs=-1),
+    "ExtraTrees 1000": lambda: ExtraTreesClassifier(n_estimators=1000, class_weight="balanced", random_state=42, n_jobs=-1),
+    "ExtraTrees 500·특징10%": lambda: ExtraTreesClassifier(n_estimators=500, max_features=0.1, class_weight="balanced",
+                                                         random_state=42, n_jobs=-1),
     "GradientBoosting": lambda: HistGradientBoostingClassifier(max_iter=200, learning_rate=0.08, class_weight="balanced",
                                                                random_state=42),
     "LogReg": lambda: make_pipeline(StandardScaler(), LogisticRegression(C=0.05, max_iter=3000, class_weight="balanced")),
@@ -125,6 +131,32 @@ def evaluate(make_model, augs: list[str]) -> dict:
             "ext_detail": dict(zip(ext_df.clip_id, ext_pred))}
 
 
+def evaluate_tta(make_model, augs: list[str], tta: list[str]) -> dict:
+    """예측할 때 증강(TTA): 같은 영상의 원본·반전·기울임 버전 확률을 평균 내 답을 정한다."""
+    data = select(augs)
+    accs = []
+    for s in SUBJECTS:
+        tr = data[data.subject != s]
+        m = make_model()
+        m.fit(tr[FEATS].to_numpy(float), tr.action_label.to_numpy())
+        te = train_df[(train_df.subject == s) & (train_df.aug.isin(tta))]
+        p = pd.DataFrame(m.predict_proba(te[FEATS].to_numpy(float)), columns=m.classes_)
+        p["clip_id"] = te.clip_id.to_numpy()
+        avg = p.groupby("clip_id").mean()
+        truth = te.drop_duplicates("clip_id").set_index("clip_id").action_label
+        accs.append(float((avg.idxmax(axis=1) == truth.loc[avg.index]).mean()))
+    m = make_model()
+    m.fit(data[FEATS].to_numpy(float), data.action_label.to_numpy())
+    te = ext_all[ext_all.aug.isin(tta)]
+    p = pd.DataFrame(m.predict_proba(te[FEATS].to_numpy(float)), columns=m.classes_)
+    p["clip_id"] = te.clip_id.to_numpy()
+    avg = p.groupby("clip_id").mean()
+    truth = te.drop_duplicates("clip_id").set_index("clip_id").loc[avg.index]
+    ok = avg.idxmax(axis=1) == truth.action_label
+    return {"loso_acc": float(np.mean(accs)), "loso_min": float(np.min(accs)), "ext_acc": float(ok.mean()),
+            "ext_new5": float(ok[truth.source == "new_video"].mean()), "ext_detail": avg.idxmax(axis=1).to_dict()}
+
+
 def show(results: dict, name: str):
     df = pd.DataFrame({k: {kk: vv for kk, vv in v.items() if kk not in ("per_action", "ext_detail")}
                        for k, v in results.items()}).T
@@ -163,10 +195,11 @@ def main():
         augs = sys.argv[sys.argv.index("--augs") + 1].split(",")
         names = sys.argv[sys.argv.index("--models") + 1].split("|") if "--models" in sys.argv else list(MODELS)
         res = {}
+        ev = evaluate_seeds if "--seeds" in sys.argv else evaluate
         for k in names:
-            res[k] = evaluate(MODELS[k], augs)
+            res[k] = ev(MODELS[k], augs)
             print(f"{k}: LOSO {res[k]['loso_acc']:.3f} 외부 {res[k]['ext_acc']:.2f}  ({time.time() - t0:.0f}s)", flush=True)
-        df, pa, det = show(res, "model_compare")
+        df, pa, det = show(res, "model_compare_3seeds" if "--seeds" in sys.argv else "model_compare")
         print("\n동작별 LOSO:\n" + pa.to_string())
         print("\n외부 영상 예측:\n" + det.to_string())
     elif stage == "aug3":   # 상위 후보를 무작위 시드 3개로 다시 비교
@@ -187,6 +220,49 @@ def main():
                   f"  ({time.time() - t0:.0f}s)", flush=True)
         df, pa, det = show(res, "aug_compare_3seeds")
         print("\n동작별 LOSO:\n" + pa.to_string())
+    elif stage == "fps30":   # 30fps 흉내 증강 효과 + 30fps로 바꾼 학습 영상으로도 평가
+        model = MODELS["ExtraTrees 500·특징10%"]
+        base = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad"]
+        res = {"A6 (30fps 없음)": evaluate_seeds(model, base), "A6 + fps30": evaluate_seeds(model, base + ["fps30"])}
+        for k, r in res.items():
+            print(f"{k}: LOSO {r['loso_acc']:.3f} 최저 {r['loso_min']:.3f} 외부 {r['ext_acc']:.2f} (새 영상 {r['ext_new5']:.2f})")
+        # 빠진 사람의 영상을 30fps로 바꿔 평가: 30fps 입력에서 얼마나 떨어지는지
+        for k, augs in (("A6 (30fps 없음)", base), ("A6 + fps30", base + ["fps30"])):
+            accs = []
+            for sd in SEEDS:
+                for s in SUBJECTS:
+                    tr = select(augs)
+                    tr = tr[tr.subject != s]
+                    te = train_df[(train_df.subject == s) & (train_df.aug == "fps30")]
+                    m = model()
+                    m.set_params(random_state=sd)
+                    m.fit(tr[FEATS].to_numpy(float), tr.action_label.to_numpy())
+                    accs.append(accuracy_score(te.action_label, m.predict(te[FEATS].to_numpy(float))))
+            print(f"  {k} → 30fps로 바꾼 영상 LOSO {np.mean(accs):.3f}")
+        show(res, "fps30_compare")
+    elif stage == "tta":    # 예측할 때 증강 비교 (모델·학습 증강은 고정)
+        augs = sys.argv[sys.argv.index("--augs") + 1].split(",")
+        model = sys.argv[sys.argv.index("--model") + 1]
+        sets = {"원본만": ["orig"], "원본+반전": ["orig", "hflip"], "원본+반전+기울임": ["orig", "hflip", "rot+", "rot-"]}
+        rows = {}
+        for k, tta in sets.items():
+            runs = []
+            for sd in SEEDS:
+                def mk(sd=sd):
+                    m = MODELS[model]()
+                    for est in [m] + [e for _, e in getattr(m, "estimators", [])]:
+                        if hasattr(est, "random_state"):
+                            est.set_params(random_state=sd)
+                    return m
+                runs.append(evaluate_tta(mk, augs, tta))
+            rows[k] = {x: float(np.mean([r[x] for r in runs])) for x in ("loso_acc", "loso_min", "ext_acc", "ext_new5")}
+            rows[k]["ext_detail"] = runs[0]["ext_detail"]
+            print(f"TTA {k}: LOSO {rows[k]['loso_acc']:.3f} 외부 {rows[k]['ext_acc']:.2f}  ({time.time() - t0:.0f}s)", flush=True)
+        df = pd.DataFrame({k: {x: v for x, v in r.items() if x != "ext_detail"} for k, r in rows.items()}).T
+        print(df.round(3).to_string())
+        df.to_csv(RESULTS / "tta_compare.csv", encoding="utf-8-sig")
+        det = pd.DataFrame({k: r["ext_detail"] for k, r in rows.items()})
+        print(det.to_string())
 
 
 if __name__ == "__main__":

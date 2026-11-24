@@ -1,5 +1,5 @@
 {
-  "train_clips": 340,
+  "train_clips": 2040,
   "subjects": [
     "S01",
     "S02",
@@ -32,7 +32,7 @@
   "n_estimators": 300,
   "max_depth": null,
   "random_state": 42,
-  "condition": "team_45d_segment",
+  "condition": "team_45d_segment_floor0.4_summary_aug7_extratrees",
   "frame_feature_count": 45,
   "team_features": [
     "torso_tilt_deg",
@@ -49,11 +49,24 @@
     "T02",
     "T03"
   ],
-  "augmentation": "hflip of T02 (side) train clips",
-  "augmented_clips": 85,
+  "augmentation": [
+    "hflip",
+    "fast",
+    "slow",
+    "jitter",
+    "rot+",
+    "rot-",
+    "pad"
+  ],
+  "augmented_clips": 1785,
   "action_classes_csv": "configs/team03_action_classes.csv",
   "segment_only": true,
   "segment_floor": 0.4,
   "summary_features": true,
-  "summary_feature_count": 225
+  "summary_feature_count": 225,
+  "model": "ExtraTreesClassifier(n_estimators=500, max_features=0.1, class_weight='balanced', random_state=42)",
+  "original_clips": 255,
+  "trained_with": "vision_action_platform/training/train_final.py (서비스와 같은 Feature 계산 코드)",
+  "loso_accuracy_3seeds": 0.881,
+  "loso_min_subject": 0.837
 }

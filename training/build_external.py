@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pandas as pd  # noqa: E402
 
-from dataset import AI  # noqa: E402
+from dataset import AI, augment  # noqa: E402
 from services.action_inference import MIN_PERSON_SCORE, MIN_TRACK_SEC  # noqa: E402
 from services.model_loader import load_bundle  # noqa: E402
 from services.pose_pipeline import track_features, track_to_frames, track_video  # noqa: E402
@@ -49,16 +49,21 @@ def main():
                 continue
             q = measure(frames, info.fps, info.width, info.height)
             if q["is_main"]:
-                cands.append((len(tr.frame_ids), frames))
+                cands.append((len(tr.frame_ids), tid))
         if not cands:
             print("주인공 없음:", path)
             continue
-        frames = max(cands, key=lambda x: x[0])[1]
-        vec, used, seg = track_features(frames, info.fps, 30, 10, segment_only=True, segment_floor=0.4,
-                                        summary_names=frame_names)
-        rows.append({"clip_id": Path(path).stem, "action_label": label, "source": source,
-                     **{f"f{i}": float(v) for i, v in enumerate(vec)}})
-        print(f"{Path(path).name}: {info.width}x{info.height} {info.fps:.0f}fps 주인공 {len(cands)}명, 구간 {seg}")
+        # 주인공 중 가장 오래 보인 사람, 같으면 먼저 나타난 사람(번호가 작은 쪽)
+        # (#15는 두 사람이 8초 내내 보였고, 발차기한 사람이 ID 1이다)
+        tid = max(cands, key=lambda c: (c[0], -c[1]))[1]
+        # 예측할 때 증강(TTA) 실험용: 원본 + 좌우 반전 + ±7도 기울임
+        for kind in ("orig", "hflip", "rot+", "rot-"):
+            tr2, fps2 = augment(tracks[tid], info.fps, kind, float(info.width), seed=0)
+            vec, used, seg = track_features(track_to_frames(tr2), fps2, 30, 10, segment_only=True, segment_floor=0.4,
+                                            summary_names=frame_names)
+            rows.append({"clip_id": Path(path).stem, "action_label": label, "source": source, "aug": kind,
+                         **{f"f{i}": float(v) for i, v in enumerate(vec)}})
+        print(f"{Path(path).name}: {info.width}x{info.height} {info.fps:.0f}fps 주인공 {len(cands)}명")
     pd.DataFrame(rows).to_pickle(Path(__file__).resolve().parent / "cache" / "external_floor0.4.pkl")
 
 
