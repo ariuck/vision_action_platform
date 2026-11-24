@@ -55,12 +55,18 @@ class Track:
     keypoints: list[np.ndarray] = field(default_factory=list)   # (17, 2) Pixel 좌표
     confidences: list[np.ndarray] = field(default_factory=list)  # (17,)
     boxes: list[np.ndarray] = field(default_factory=list)       # (4,) x1, y1, x2, y2
+    scores: list[float] = field(default_factory=list)           # 사람 인식 신뢰도 (BBox confidence)
 
-    def add(self, frame_id, kp, conf, box):
+    def add(self, frame_id, kp, conf, box, score=1.0):
         self.frame_ids.append(int(frame_id))
         self.keypoints.append(np.asarray(kp, dtype=np.float64))
         self.confidences.append(np.asarray(conf, dtype=np.float64))
         self.boxes.append(np.asarray(box, dtype=np.float64))
+        self.scores.append(float(score))
+
+    @property
+    def median_score(self) -> float:
+        return float(np.median(self.scores)) if self.scores else 0.0
 
 
 def track_video(path: str, bundle) -> tuple[VideoInfo, dict[int, Track]]:
@@ -88,10 +94,11 @@ def track_video(path: str, bundle) -> tuple[VideoInfo, dict[int, Track]]:
             if boxes is not None and boxes.id is not None and kps is not None:
                 ids = boxes.id.int().cpu().numpy()
                 xyxy = boxes.xyxy.cpu().numpy()
+                scores = boxes.conf.cpu().numpy()
                 kp_xy = kps.xy.cpu().numpy()
                 kp_conf = kps.conf.cpu().numpy() if kps.conf is not None else np.ones(kp_xy.shape[:2])
                 for i, tid in enumerate(ids):
-                    tracks.setdefault(int(tid), Track(int(tid))).add(frame_id, kp_xy[i], kp_conf[i], xyxy[i])
+                    tracks.setdefault(int(tid), Track(int(tid))).add(frame_id, kp_xy[i], kp_conf[i], xyxy[i], scores[i])
             frame_id += 1
     cap.release()
     if frame_id == 0:

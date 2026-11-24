@@ -16,6 +16,9 @@ NO_ACTION_LABEL = "no_action"
 UNCERTAIN_BELOW = float(os.getenv("UNCERTAIN_BELOW", "0.20"))
 # 이보다 짧게 보인 Track은 잠깐 생긴 중복 박스로 보고 예측하지 않는다.
 MIN_TRACK_SEC = float(os.getenv("MIN_TRACK_SEC", "0.5"))
+# 사람 인식 신뢰도(BBox confidence) 중앙값이 이보다 낮은 Track은 사람이 아닌 것으로 보고 뺀다.
+# 학습 영상의 실제 사람은 모두 0.85 이상, 카메라에서 의자에 걸린 외투 같은 가짜 사람은 0.31~0.73이었다.
+MIN_PERSON_SCORE = float(os.getenv("MIN_PERSON_SCORE", "0.75"))
 
 
 def predict_video(path: str, bundle) -> dict:
@@ -30,6 +33,10 @@ def predict_video(path: str, bundle) -> dict:
         seen_sec = (track.frame_ids[-1] - track.frame_ids[0] + 1) / info.fps
         if seen_sec < MIN_TRACK_SEC:
             skipped.append({"track_id": tid, "reason": f"{seen_sec:.2f}초만 보여 예측하지 않았습니다."})
+            continue
+        if track.median_score < MIN_PERSON_SCORE:
+            # Frame마다 자르지 않고 사람(Track) 단위로 거른다 → 진짜 사람의 Frame은 학습 때와 똑같이 남는다
+            skipped.append({"track_id": tid, "reason": f"사람일 가능성이 낮아 제외했습니다 (인식 신뢰도 {track.median_score:.2f})."})
             continue
         frames = track_to_frames(track)
         # 모델이 동작 구간만으로 학습됐으면 예측할 때도 같은 규칙으로 잘라서 넣는다
@@ -72,9 +79,17 @@ def predict_video(path: str, bundle) -> dict:
     main = [p for p in predictions if p["is_main"]]
     if predictions:
         status = "ok"
-        message = f"{len(main)}명의 동작을 예측했습니다."
-        if len(predictions) > len(main):
-            message += f" (배경 인물 {len(predictions) - len(main)}명 제외)"
+        acted = sum(not p["no_action"] for p in main)
+        still = len(main) - acted
+        parts = ([f"{acted}명의 동작을 예측했습니다."] if acted else []) + \
+                ([f"{still}명은 움직임이 거의 없어 '동작 없음'으로 판단했습니다."] if still else [])
+        message = " ".join(parts)
+        background = len(predictions) - len(main)
+        not_person = sum("사람일 가능성이 낮아" in s["reason"] for s in skipped)
+        excluded = ([f"배경 인물 {background}명"] if background else []) + \
+                   ([f"사람이 아닌 대상 {not_person}개"] if not_person else [])
+        if excluded:
+            message += f" ({' · '.join(excluded)} 제외)"
         if not main:
             message = "화면 앞쪽에서 몸 전체가 보이는 사람이 없습니다. 카메라 위치를 확인하세요."
     elif tracks:

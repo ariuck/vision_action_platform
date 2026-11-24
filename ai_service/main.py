@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from routers.predictions import router as prediction_router
-from services.action_inference import UNCERTAIN_BELOW
+from services.action_inference import MIN_PERSON_SCORE, UNCERTAIN_BELOW
 from services import track_quality as tq
 from services.model_loader import load_bundle
 
@@ -40,10 +40,12 @@ def health():
         "frame_feature_count": bundle.frame_feature_count,
         "sequence_steps": bundle.sequence_steps,
         "train_clips": bundle.training_info.get("train_clips"),
+        "segment_only": bool(bundle.training_info.get("segment_only")),
         "pose_model": bundle.project_config["pose_model"],
         "device": bundle.device,
         "uncertain_below": UNCERTAIN_BELOW,
         "no_action_motion": tq.NO_ACTION_MOTION,
+        "min_person_score": MIN_PERSON_SCORE,
         "main_person": {"min_height": tq.MAIN_MIN_HEIGHT, "min_sec": tq.MAIN_MIN_SEC,
                         "max_edge": tq.MAIN_MAX_EDGE, "min_legs": tq.MAIN_MIN_LEGS},
     }
