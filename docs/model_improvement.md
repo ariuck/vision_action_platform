@@ -4,8 +4,8 @@
 모델 학습과 실험 원본은 [`ariuck/subject10_pose_action`](https://github.com/ariuck/subject10_pose_action) 레포에 있다.
 이 문서는 서비스에 넣은 모델이 어떻게 만들어졌고, 성능을 올리려고 무엇을 했는지 정리한 것이다.
 
-> 교재 자율 프로젝트의 기본 모델은 교재 6개 동작(`bend_return` 등) Random Forest다.
-> 이 프로젝트는 팀에서 직접 촬영·라벨링한 17개 이상행동 모델을 대신 사용한다. 실제 서비스 목적(무인 상점 이상행동 감지)에 맞는 동작을 다루기 위해서다.
+> 교재의 기본 모델은 6개 일상 동작(`bend_return` 등) Random Forest다.
+> 이 프로젝트는 팀에서 직접 촬영·라벨링한 17개 이상행동 모델을 쓰기로 했다. 서비스 목적이 무인 상점 이상행동 감지라서, 그 상황에 맞는 동작을 다루는 모델이 필요했다.
 
 ## 1. 모델 개요
 
@@ -17,7 +17,7 @@
 | Sequence | 영상 한 구간을 30 Step으로 맞춤 → 30 × 45 = 1,350 Feature |
 | 분류기 | Random Forest 300 Tree, class_weight balanced |
 | 동작 | 17개 (A001 키오스크 두드리기 ~ A017 앞으로 넘어지기) |
-| 학습 데이터 | 사람·동작마다 4개: 정면 + 측면 + 측면 좌우 반전 + 후면 |
+| 학습 데이터 | 사람·동작마다 4개: 정면 + 측면 + 측면 좌우 반전 + 후면 → 5명 전체 340개 (원본 255 + 반전 85) |
 | 예상 성능 | 처음 보는 사람 기준 Accuracy 약 0.75 (5명 교차 평가 평균 0.753, 범위 0.686~0.824) |
 
 ## 2. 데이터
@@ -69,17 +69,17 @@
 - 정확도는 "후면만 추가"(0.761)와 "후면 + 측면 반전"(0.753)이 사실상 같다.
 - "후면 + 측면 반전"은 Confidence가 가장 높다. 서비스에서 Confidence 기준을 넘는 예측이 더 많이 나와, UNKNOWN으로 보류되는 경우가 줄어든다.
 - 측면 카메라가 반대쪽에 달린 매장도 대비할 수 있다.
+- 구성을 정한 뒤 서비스용 모델은 **5명 전체 데이터(340개)로 다시 학습**했다. 평가에 쓸 사람이 남지 않으므로, 처음 보는 사람에 대한 성능은 같은 구성의 5명 교차 평가 평균(0.753)으로 본다.
 
 ## 5. 서비스에서 주의할 점
 
 - 모델 입력은 45-D Feature다. 교재 실시간 코드는 38-D만 계산하므로, AI 서버의 Feature 계산에 팀 Feature 7개(속도는 0.1초 간격)를 함께 넣어야 한다.
 - 17개가 모두 이상행동이고 정상행동 데이터가 없다. 평범하게 서 있는 사람도 17개 중 하나로 예측될 수 있으므로, 결과는 Confidence와 함께 보여 주고 이상행동으로 확정하지 않는다.
 - 팔로 하는 동작끼리(밀치기 ↔ 잡고 흔들기 ↔ 샷건) 헷갈림이 남아 있다. 물체 위치 정보 없이 Pose만으로는 구분이 어렵다.
-- 모델 파일(`.joblib`)과 YOLO 가중치(`.pt`)는 용량 때문에 Git에 올리지 않는다. `subject10_pose_action/artifacts/team03/day06/team_45d_3view_hflip/`의 세 파일(`rf_action_baseline.joblib`, `rf_feature_columns.json`, `rf_training_info.json`)을 AI 서버의 모델 폴더로 복사해서 쓴다.
+- 모델 파일(`.joblib`, 약 9MB)과 YOLO 가중치(`.pt`)는 Git에 올리지 않는다. `subject10_pose_action/artifacts/team03/day06/team_45d_3view_hflip_all5/`의 세 파일(`rf_action_baseline.joblib`, `rf_feature_columns.json`, `rf_training_info.json`)을 AI 서버의 모델 폴더로 복사해서 쓴다. 다시 만들 때는 `subject10_pose_action`에서 `python scripts/team03/team_train_final_all.py`를 실행한다.
 
 ## 6. 다음 개선 후보
 
-- 서비스용 모델을 5명 전체 데이터로 다시 학습 (성능 추정은 위 교차 평가 평균 사용)
 - 정상행동 영상 추가 → "정상 vs 이상" 판단
 - 물체 위치(ROI)와 손·발 사이 거리 Feature
 - 시간 순서를 직접 다루는 모델(LSTM·1D-CNN)과 비교
