@@ -1,0 +1,14 @@
+# 학습 환경(subject10_pose_action)과 같은 버전으로 맞춘다.
+# 버전이 다르면 joblib으로 저장한 Random Forest를 읽지 못하거나 결과가 달라질 수 있다.
+fastapi==0.136.1
+uvicorn[standard]==0.46.0
+python-multipart==0.0.32
+ultralytics==8.4.214
+lap==0.5.14
+scikit-learn==1.9.1
+numpy==2.5.5
+pandas==3.1.1
+scipy==1.18.1
+joblib==1.6.0
+opencv-python-headless==5.0.0.93
+# torch는 Dockerfile에서 CPU 전용 버전(2.15.0)을 먼저 설치한다.

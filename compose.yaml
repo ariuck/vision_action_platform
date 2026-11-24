@@ -1,0 +1,97 @@
+# 무인 상점 이상행동 분석 서비스: 컨테이너 5개
+#   django(웹·API) → redis(작업 대기열) → celery(작업 실행) → fastapi(AI 추론)
+#   django·celery → postgres(작업·결과 저장)
+# 실행: cp .env.example .env  (값 수정) → docker compose up -d --build
+name: vision-action-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  fastapi:
+    build: ./ai_service
+    env_file: .env
+    environment:
+      MODEL_DIR: /app/models
+      POSE_DEVICE: cpu
+    volumes:
+      - ./ai_service/models:/app/models:ro   # 학습한 모델 파일 (Git에는 올리지 않음)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  django:
+    build: ./backend
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      AI_SERVICE_URL: http://fastapi:8001
+      MEDIA_ROOT: /data/media
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/accounts/login/', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  celery:
+    build: ./backend
+    command: celery -A config worker --loglevel=info --concurrency=1
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      AI_SERVICE_URL: http://fastapi:8001
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media_data:/data/media   # 업로드 영상·카메라 녹화본을 django와 함께 사용
+    depends_on:
+      django: { condition: service_healthy }   # migrate가 끝난 뒤 시작
+      fastapi: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout 5"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_data:

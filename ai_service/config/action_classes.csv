@@ -1,0 +1,18 @@
+action_id,action_label,action_name,behavior_type,group,target_object,description
+A001,kiosk_tap,키오스크 두드리기,temporal,타격·파손,키오스크,한 손을 머리 위로 들어 키오스크를 내려친다
+A002,throw_one_hand,한손 물건 던지기,temporal,던지기,물건,한 팔을 뒤로 젖혔다가 앞으로 물건을 던진다
+A003,front_kick,앞차기,temporal,차기,냉동고,한 발을 앞으로 들어 냉동고를 찬다
+A004,grab_shake,잡고 흔들기,temporal,밀기·흔들기,뽑기기계,두 손으로 뽑기기계를 잡고 앞뒤로 흔든다
+A005,push,밀치기,temporal,밀기·흔들기,사람·물체,두 손으로 앞을 세게 민다
+A006,swing,휘두르기,temporal,타격·파손,빗자루(도구),도구를 두 손으로 들어 휘둘러 친다
+A007,sit_floor,바닥에 앉기,posture,앉기,바닥 매트,바닥에 앉아 자리를 차지한다
+A008,sit_on_object,위에 앉기,posture,앉기,의자·테이블,높은 곳에 뛰어올라 앉아 휴대폰을 본다
+A009,lie_forward,앞으로 눕기,posture,눕기·쓰러짐,바닥,바닥에 엎드려 휴대폰을 본다
+A010,lie_backward,뒤로 눕기,posture,눕기·쓰러짐,바닥,바닥에 등을 대고 누웠다가 옆으로 돌아눕는다
+A011,body_slam,몸통 박치기,temporal,밀기·흔들기,사람·물체,몸통으로 대상을 들이받는다
+A012,crouch_take_item,쪼그려 물건 빼내기,posture,앉기,뽑기기계,무릎을 꿇고 앉아 뽑기기계 안으로 손을 넣는다
+A013,shotgun,샷건,temporal,타격·파손,테이블,손으로 테이블을 위에서 아래로 내려친다
+A014,vomit,구토,posture,숙이기,바닥,허리를 숙여 바닥 쪽으로 구토한다
+A015,fall_sideways,옆으로 쓰러지기,posture,눕기·쓰러짐,벽,벽 옆에 서 있다가 벽 쪽으로 미끄러지듯 옆으로 주저앉아 쓰러진다
+A016,fall_backward,뒤로 넘어지기,temporal,눕기·쓰러짐,바닥,서 있다가 뒤로 쓰러져 누운 채 움직이지 않는다
+A017,fall_forward,앞으로 넘어지기,temporal,눕기·쓰러짐,장애물,걷다가 걸려 앞으로 넘어져 손·무릎으로 버틴다

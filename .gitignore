@@ -1,0 +1,20 @@
+# 비밀값
+.env
+**/.dev_credentials
+
+# 가상환경·캐시
+.venv/
+__pycache__/
+*.pyc
+
+# 모델 가중치 (용량·재현은 docs/model_improvement.md 참고)
+ai_service/models/*.joblib
+ai_service/models/*.pt
+
+# 실행 중 생기는 데이터 (영상에는 얼굴이 나오므로 올리지 않는다)
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+*.mp4
+*.avi
+*.mov

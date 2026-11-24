@@ -1,0 +1,55 @@
+{
+  "train_clips": 340,
+  "subjects": [
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S05"
+  ],
+  "classes": [
+    "body_slam",
+    "crouch_take_item",
+    "fall_backward",
+    "fall_forward",
+    "fall_sideways",
+    "front_kick",
+    "grab_shake",
+    "kiosk_tap",
+    "lie_backward",
+    "lie_forward",
+    "push",
+    "shotgun",
+    "sit_floor",
+    "sit_on_object",
+    "swing",
+    "throw_one_hand",
+    "vomit"
+  ],
+  "feature_count": 1350,
+  "sequence_steps": 30,
+  "min_valid_frames": 10,
+  "n_estimators": 300,
+  "max_depth": null,
+  "random_state": 42,
+  "condition": "team_45d",
+  "frame_feature_count": 45,
+  "team_features": [
+    "torso_tilt_deg",
+    "bbox_aspect_ratio",
+    "hip_floor_height",
+    "left_ankle_speed",
+    "right_ankle_speed",
+    "left_wrist_speed",
+    "right_wrist_speed"
+  ],
+  "class_weight": "balanced",
+  "views": [
+    "T01",
+    "T02",
+    "T03"
+  ],
+  "augmentation": "hflip of T02 (side) train clips",
+  "augmented_clips": 85,
+  "action_classes_csv": "configs/team03_action_classes.csv"
+}
