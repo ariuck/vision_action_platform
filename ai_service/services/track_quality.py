@@ -23,7 +23,6 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from src.team_features import torso_length
 
 BODY_JOINTS = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 LAG_SEC = 0.1
@@ -38,15 +37,24 @@ MAIN_MAX_EDGE = float(os.getenv("MAIN_MAX_EDGE", "0.5"))   # 화면 끝에 걸�
 MAIN_MIN_LEGS = float(os.getenv("MAIN_MIN_LEGS", "0.3"))   # 두 발목이 보인 Frame 비율이 이 이상이어야 주인공
 
 
-def motion_curve(frames: pd.DataFrame, fps: float) -> np.ndarray:
+def motion_curve(frames: pd.DataFrame, fps: float, pos_smooth_sec: float = 0.0) -> np.ndarray:
+    """pos_smooth_sec > 0 이면 관절 좌표를 그 시간 폭의 이동 중앙값으로 다듬은 뒤 움직임을 잰다.
+
+    카메라는 가만히 서 있어도 관절 점이 떨려 서 있는 시간이 동작 구간에 들어갔다.
+    학습 코드(team_action_segments.motion_curve)와 같은 순서: 좌표 다듬기 → 상체 길이 → 0.1초 이동 거리.
+    """
     pose = frames["pose_ok"].to_numpy(bool)
     n = len(frames)
     xy = np.full((n, len(BODY_JOINTS), 2), np.nan)
-    torso = np.full(n, np.nan)
     for i, (ok, k) in enumerate(zip(pose, frames["kp"])):
         if ok:
             xy[i] = k[BODY_JOINTS]
-            torso[i] = torso_length(k)
+    win = int(round(pos_smooth_sec * fps))
+    if win > 1:
+        for c in range(2):
+            xy[:, :, c] = pd.DataFrame(xy[:, :, c]).rolling(win, center=True, min_periods=1).median().to_numpy()
+    # BODY_JOINTS 순서에서 0·1 = 어깨, 6·7 = 골반
+    torso = np.linalg.norm((xy[:, 0] + xy[:, 1]) / 2 - (xy[:, 6] + xy[:, 7]) / 2, axis=1)
     if not np.isfinite(torso).any():
         return np.array([])
     torso_med = float(np.nanmedian(torso))
