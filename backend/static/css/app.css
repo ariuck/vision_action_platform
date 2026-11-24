@@ -59,6 +59,12 @@ form.inline { display: inline; }
 .check { display: flex; align-items: center; gap: 6px; margin: 0; }
 .check input { width: auto; margin: 0; }
 .file-label { margin-top: 10px; }
+.cam-tools { flex-wrap: wrap; }
+.cam-add { margin-top: 10px; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; }
+.cam-add[hidden] { display: none; }
+.cam-add-grid { display: grid; grid-template-columns: 1.2fr 1.4fr .8fr 1fr; gap: 10px; }
+.cam-add-grid label { margin: 0; }
+@media (max-width: 800px) { .cam-add-grid { grid-template-columns: 1fr 1fr; } }
 .start-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .primary.big { padding: 12px 28px; font-size: 16px; font-weight: 700; }
 .capture-info { color: var(--muted); font-size: 14px; }

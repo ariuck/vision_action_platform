@@ -27,28 +27,34 @@
       </div>
 
       <div class="pane hidden" data-pane="CAMERA">
-        {% if cameras %}
-          <div class="stage-box camera-box">
-            <img id="cam-img" alt="IP Webcam 미리보기">
-            <canvas id="cam-overlay"></canvas>
-            <div id="cam-state" class="cam-state">카메라 연결 중…</div>
-            <div id="rec-badge" class="rec-badge" hidden>● 녹화 중 <span id="rec-left"></span></div>
-            <div id="countdown" class="countdown" hidden></div>
+        <div class="stage-box camera-box">
+          <img id="cam-img" alt="IP Webcam 미리보기">
+          <canvas id="cam-overlay"></canvas>
+          <div id="cam-state" class="cam-state">카메라 연결 중…</div>
+          <div id="rec-badge" class="rec-badge" hidden>● 녹화 중 <span id="rec-left"></span></div>
+          <div id="countdown" class="countdown" hidden></div>
+        </div>
+        <div class="cam-tools">
+          <label class="inline-label">카메라
+            <select name="camera_name" id="camera-name">{% for c in cameras %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+          </label>
+          <button type="button" class="link" id="cam-add-toggle">+ 카메라 추가</button>
+          <button type="button" class="link danger" id="cam-del">선택 카메라 삭제</button>
+          <label class="check"><input type="checkbox" id="show-skeleton" checked> 뼈대 표시</label>
+        </div>
+        <div id="cam-add" class="cam-add" hidden>
+          <div class="cam-add-grid">
+            <label>이름 <input type="text" id="cam-new-name" maxlength="30" placeholder="예: 계산대폰"></label>
+            <label>IP 주소 <input type="text" id="cam-new-ip" placeholder="192.168.0.10"></label>
+            <label>포트 <input type="number" id="cam-new-port" value="4747" min="1" max="65535"></label>
+            <label>경로 <input type="text" id="cam-new-path" value="/video"></label>
           </div>
-          <div class="cam-tools">
-            {% if cameras|length > 1 %}
-              <label class="inline-label">카메라
-                <select name="camera_name" id="camera-name">{% for c in cameras %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
-              </label>
-            {% else %}
-              <input type="hidden" name="camera_name" id="camera-name" value="{{ cameras.0 }}">
-              <span class="muted">카메라: {{ cameras.0 }}</span>
-            {% endif %}
-            <label class="check"><input type="checkbox" id="show-skeleton" checked> 뼈대 표시</label>
+          <div class="start-row">
+            <button type="button" class="primary" id="cam-add-btn">등록하고 연결</button>
+            <span class="muted">같은 Wi-Fi의 휴대폰(192.168.x.x)만 등록할 수 있어요. DroidCam 기본값: 포트 4747, 경로 /video</span>
           </div>
-        {% else %}
-          <div class="stage-box"><p class="placeholder error">등록된 카메라가 없습니다. 관리자가 .env의 ALLOWED_CAMERAS에 등록해야 합니다.</p></div>
-        {% endif %}
+          <p class="error" id="cam-add-error"></p>
+        </div>
       </div>
 
       <div class="row">

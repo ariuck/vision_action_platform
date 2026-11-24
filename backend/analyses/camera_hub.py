@@ -48,10 +48,12 @@ def _key(name: str, part: str) -> str:
 
 
 def camera_url(name: str) -> str:
-    try:
-        return settings.ALLOWED_CAMERAS[name]
-    except KeyError as exc:
-        raise CameraError("CAMERA_NOT_ALLOWED", f"허용되지 않은 카메라입니다: {name}") from exc
+    from .camera_registry import get_url
+
+    url = get_url(name)
+    if not url:
+        raise CameraError("CAMERA_NOT_ALLOWED", f"등록되지 않은 카메라입니다: {name}")
+    return url
 
 
 def keep_alive(name: str) -> None:

@@ -117,6 +117,10 @@
       name: () => nameEl.value,
       start() {
         if (running) return;
+        if (!nameEl.value) {
+          setState("등록된 카메라가 없습니다. 아래 '+ 카메라 추가'로 휴대폰 주소를 등록해 주세요.");
+          return;
+        }
         running = true;
         loopId += 1;
         setState("카메라 연결 중…");
@@ -132,9 +136,44 @@
       },
     };
   })();
-  if ($("camera-name") && $("camera-name").tagName === "SELECT") {
-    $("camera-name").addEventListener("change", () => { camera.stop(); camera.start(); });
+  // ---------------- 카메라 등록·삭제 ----------------
+  const camSelect = $("camera-name");
+  const restartCamera = () => { camera.stop(); if (mode === "CAMERA") camera.start(); };
+  camSelect.addEventListener("change", restartCamera);
+
+  async function reloadCameras(select) {
+    const res = await api("/api/cameras/");
+    if (!res.ok) return;
+    const { cameras } = await res.json();
+    camSelect.innerHTML = cameras.map((c) => `<option value="${esc(c.name)}">${esc(c.name)} · ${esc(c.address)}</option>`).join("");
+    if (select) camSelect.value = select;
+    $("cam-del").hidden = !cameras.some((c) => c.deletable && c.name === camSelect.value);
+    camSelect.onchange = () => { $("cam-del").hidden = !cameras.some((c) => c.deletable && c.name === camSelect.value); };
   }
+  reloadCameras();
+
+  $("cam-add-toggle").addEventListener("click", () => { $("cam-add").hidden = !$("cam-add").hidden; });
+  $("cam-add").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("cam-add-btn").click(); } });
+  $("cam-add-btn").addEventListener("click", async () => {
+    const body = { name: $("cam-new-name").value.trim(), ip: $("cam-new-ip").value.trim(),
+                   port: $("cam-new-port").value, path: $("cam-new-path").value.trim() };
+    const res = await api("/api/cameras/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) {
+      $("cam-add-error").textContent = (data.errors || [data.detail]).join(" ");
+      return;
+    }
+    $("cam-add-error").textContent = "";
+    $("cam-add").hidden = true;
+    await reloadCameras(data.name);
+    restartCamera();
+  });
+  $("cam-del").addEventListener("click", async () => {
+    const name = camSelect.value;
+    if (!name || !confirm(`'${name}' 카메라 등록을 삭제할까요?`)) return;
+    const res = await api(`/api/cameras/${encodeURIComponent(name)}/`, { method: "DELETE" });
+    if (res.ok) { await reloadCameras(); restartCamera(); }
+  });
 
   // ---------------- 분석 상태 표시 ----------------
   function setFlow(stage, inputType) {

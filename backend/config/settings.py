@@ -135,5 +135,7 @@ for item in env_list("ALLOWED_CAMERAS"):
         ALLOWED_CAMERAS[name.strip()] = url.strip()
 CAMERA_CAPTURE_SECONDS = float(os.getenv("CAMERA_CAPTURE_SECONDS", "8"))
 CAMERA_CONNECT_TIMEOUT = float(os.getenv("CAMERA_CONNECT_TIMEOUT", "10"))
+# 화면에서 카메라를 등록할 때 허용하는 IP 대역 (같은 Wi-Fi 공유기 대역)
+CAMERA_ALLOWED_NETWORKS = env_list("CAMERA_ALLOWED_NETWORKS", "192.168.0.0/16")
 # 카메라 Frame을 미리보기·녹화가 함께 쓰도록 올려 두는 Redis (Celery 대기열과 다른 번호 사용)
 CAMERA_REDIS_URL = os.getenv("CAMERA_REDIS_URL", "redis://localhost:6379/2")

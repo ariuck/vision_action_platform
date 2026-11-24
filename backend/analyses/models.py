@@ -12,6 +12,21 @@ from django.db import models
 from .actions import ACTION_CHOICES
 
 
+class Camera(models.Model):
+    """화면에서 등록한 IP Webcam. 분석·미리보기는 이름으로만 고르고, 주소는 서버만 사용한다."""
+    name = models.CharField("이름", max_length=30, unique=True)
+    url = models.URLField("주소", max_length=200)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+                                   related_name="cameras")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class AnalysisJob(models.Model):
     class InputType(models.TextChoices):
         UPLOAD = "UPLOAD", "영상 업로드"

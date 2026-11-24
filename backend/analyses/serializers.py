@@ -51,8 +51,10 @@ class AnalysisJobSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"video_file": f"영상은 {settings.MAX_UPLOAD_MB}MB 이하만 됩니다."})
             attrs["camera_name"] = ""
         elif input_type == AnalysisJob.InputType.CAMERA:
+            from .camera_registry import get_url
+
             name = attrs.get("camera_name", "")
-            if name not in settings.ALLOWED_CAMERAS:
+            if not name or not get_url(name):
                 raise serializers.ValidationError({"camera_name": "등록된 카메라 중에서 골라 주세요."})
             attrs["video_file"] = None
             attrs["capture_seconds"] = settings.CAMERA_CAPTURE_SECONDS

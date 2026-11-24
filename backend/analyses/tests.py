@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from .models import AnalysisJob, PersonPrediction
+from .models import AnalysisJob, Camera, PersonPrediction
 from .services import AIServiceError
 from .tasks import run_analysis
 
@@ -186,6 +186,38 @@ class CameraViewTests(TestCase):
         self.client.login(username="erin", password="pw-erin-123")
         for view in ("camera_stream", "camera_status", "camera_pose"):
             self.assertEqual(self.client.get(reverse(f"analyses:{view}", args=["other"])).status_code, 404)
+
+    def test_register_camera_from_screen(self):
+        self.client.login(username="erin", password="pw-erin-123")
+        url = reverse("analyses:camera_list")
+        ok = self.client.post(url, {"name": "계산대폰", "ip": "192.168.40.20", "port": 4747, "path": "/video"},
+                              content_type="application/json")
+        self.assertEqual(ok.status_code, 201)
+        names = [c["name"] for c in self.client.get(url).json()["cameras"]]
+        self.assertEqual(names, ["phone", "계산대폰"])
+        # 등록한 카메라로 분석 요청·상태 조회가 된다
+        self.assertEqual(self.client.get(reverse("analyses:camera_status", args=["other"])).status_code, 404)
+        with mock.patch("analyses.camera_views.camera_hub") as hub:
+            hub.latest.return_value = (-1, None)
+            hub.last_error.return_value = None
+            self.assertEqual(self.client.get(reverse("analyses:camera_status", args=["계산대폰"])).status_code, 200)
+
+    def test_register_rejects_outside_addresses(self):
+        # 인터넷 주소·컨테이너 내부망·이름 주소는 막는다 (서버가 엉뚱한 곳에 접속하지 않게)
+        self.client.login(username="erin", password="pw-erin-123")
+        url = reverse("analyses:camera_list")
+        for ip in ("8.8.8.8", "172.18.0.3", "127.0.0.1", "redis", "10.0.0.5"):
+            res = self.client.post(url, {"name": "x", "ip": ip, "port": 4747}, content_type="application/json")
+            self.assertEqual(res.status_code, 400, ip)
+
+    def test_only_owner_can_delete_camera(self):
+        owner = User.objects.get(username="erin")
+        Camera.objects.create(name="cam1", url="http://192.168.1.5:4747/video", created_by=owner)
+        User.objects.create_user("frank", password="pw-frank-123")
+        self.client.login(username="frank", password="pw-frank-123")
+        self.assertEqual(self.client.delete(reverse("analyses:camera_delete", args=["cam1"])).status_code, 404)
+        self.client.login(username="erin", password="pw-erin-123")
+        self.assertEqual(self.client.delete(reverse("analyses:camera_delete", args=["cam1"])).status_code, 204)
 
     @mock.patch("analyses.camera_views.camera_hub")
     def test_status_reports_live(self, hub):

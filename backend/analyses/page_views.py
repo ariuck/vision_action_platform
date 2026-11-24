@@ -6,6 +6,7 @@ from django.db.models import Avg, Count
 from django.shortcuts import render
 
 from .actions import ACTION_CHOICES, ACTIONS
+from .camera_registry import all_cameras
 from .models import AnalysisJob, PersonPrediction
 
 
@@ -14,7 +15,7 @@ def index(request):
     jobs = AnalysisJob.objects.filter(user=request.user).prefetch_related("predictions")[:20]
     return render(request, "analyses/index.html", {
         "jobs": jobs,
-        "cameras": list(settings.ALLOWED_CAMERAS),
+        "cameras": list(all_cameras()),
         "capture_seconds": settings.CAMERA_CAPTURE_SECONDS,
         "action_choices": ACTION_CHOICES,
     })
