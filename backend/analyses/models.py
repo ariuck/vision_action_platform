@@ -32,7 +32,17 @@ class AnalysisJob(models.Model):
     capture_seconds = models.FloatField("수집 시간(초)", null=True, blank=True)
     expected_action = models.CharField("수행한 동작(선택)", max_length=40, choices=ACTION_CHOICES, blank=True)
 
+    class Stage(models.TextChoices):
+        # 화면 안내용 세부 단계 (status는 Celery 작업 상태 그대로 둔다)
+        QUEUED = "QUEUED", "대기"
+        CAPTURING = "CAPTURING", "영상 수집"
+        ANALYZING = "ANALYZING", "AI 분석"
+        DONE = "DONE", "완료"
+        FAILED = "FAILED", "실패"
+
     status = models.CharField("상태", max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    stage = models.CharField("진행 단계", max_length=10, choices=Stage.choices, default=Stage.QUEUED)
+    capture_started_at = models.DateTimeField("녹화 시작", null=True, blank=True)
     celery_task_id = models.CharField(max_length=64, blank=True)
     result_code = models.CharField("결과 구분", max_length=30, blank=True)  # ok / no_person / no_prediction
     message = models.CharField("결과 메시지", max_length=255, blank=True)

@@ -14,13 +14,21 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .camera_capture import CameraError, capture_clip
+from .camera_hub import CameraError, capture_clip
 from .models import AnalysisJob, PersonPrediction
 from .services import AIServiceError, request_prediction
 
 
+def _set_stage(job: AnalysisJob, stage: str, **extra) -> None:
+    job.stage = stage
+    for k, v in extra.items():
+        setattr(job, k, v)
+    job.save(update_fields=["stage", *extra])
+
+
 def _fail(job: AnalysisJob, code: str, message: str, started: float) -> None:
     job.status = AnalysisJob.Status.FAILURE
+    job.stage = AnalysisJob.Stage.FAILED
     job.error_code = code
     job.error_message = message
     job.finished_at = timezone.now()
@@ -42,7 +50,10 @@ def run_analysis(self, job_id: int) -> str:
         if job.input_type == AnalysisJob.InputType.CAMERA:
             seconds = job.capture_seconds or settings.CAMERA_CAPTURE_SECONDS
             rel = Path("videos") / "camera" / f"job{job.pk}_{uuid.uuid4().hex[:8]}.mp4"
-            info = capture_clip(job.camera_name, seconds, Path(settings.MEDIA_ROOT) / rel)
+            # 카메라 연결이 확인된 순간부터 '영상 수집' 단계로 표시 (화면의 남은 시간 계산 기준)
+            info = capture_clip(job.camera_name, seconds, Path(settings.MEDIA_ROOT) / rel,
+                                on_start=lambda: _set_stage(job, AnalysisJob.Stage.CAPTURING,
+                                                            capture_started_at=timezone.now()))
             job.video_file.name = rel.as_posix()
             job.message = f"카메라에서 {info['seconds']}초 동안 {info['frames']}개 Frame을 받았습니다."
             job.save(update_fields=["video_file", "message"])
@@ -58,6 +69,7 @@ def run_analysis(self, job_id: int) -> str:
         return "FAILURE"
 
     # 2) FastAPI 추론 요청
+    _set_stage(job, AnalysisJob.Stage.ANALYZING)
     try:
         result = request_prediction(video_path)
     except AIServiceError as exc:
@@ -77,6 +89,7 @@ def run_analysis(self, job_id: int) -> str:
             for p in result.get("predictions", [])
         ])
         job.status = AnalysisJob.Status.SUCCESS
+        job.stage = AnalysisJob.Stage.DONE
         job.result_code = result.get("status", "")
         job.message = (job.message + " " if job.message else "") + result.get("message", "")
         job.video_fps = video.get("fps")

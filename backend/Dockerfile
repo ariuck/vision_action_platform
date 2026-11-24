@@ -11,4 +11,5 @@ COPY . .
 RUN DJANGO_SECRET_KEY=build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class gthread --threads 8 --timeout 120"]
+# gthread: 카메라 미리보기 스트림이 연결을 오래 붙잡아도 다른 요청(상태 조회 등)을 계속 처리하기 위해

@@ -48,7 +48,7 @@ class AnalysisJobViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.
             result = run_analysis.delay(job_id)
         except Exception as exc:  # Redis가 꺼져 있으면 작업을 실패로 남긴다
             AnalysisJob.objects.filter(pk=job_id).update(
-                status=AnalysisJob.Status.FAILURE, error_code="QUEUE_UNAVAILABLE",
+                status=AnalysisJob.Status.FAILURE, stage=AnalysisJob.Stage.FAILED, error_code="QUEUE_UNAVAILABLE",
                 error_message=f"작업 대기열(Redis)에 등록하지 못했습니다: {exc}")
             return
         AnalysisJob.objects.filter(pk=job_id, celery_task_id="").update(celery_task_id=result.id or "")

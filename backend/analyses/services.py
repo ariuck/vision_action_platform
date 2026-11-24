@@ -37,3 +37,15 @@ def request_prediction(video_path: Path) -> dict:
         raise AIServiceError(detail.get("code", f"AI_HTTP_{response.status_code}"),
                              detail.get("message", response.text[:300]))
     raise AIServiceError(f"AI_HTTP_{response.status_code}", str(detail)[:300])
+
+
+def request_frame_pose(jpg: bytes) -> dict:
+    """미리보기 사진 1장의 관절 위치 (뼈대 그리기용, 짧은 타임아웃)."""
+    url = f"{settings.AI_SERVICE_URL.rstrip('/')}/pose/frame"
+    try:
+        response = requests.post(url, files={"file": ("frame.jpg", jpg, "image/jpeg")}, timeout=5)
+    except requests.RequestException as exc:
+        raise AIServiceError("AI_UNREACHABLE", "AI 서버에 연결할 수 없습니다.") from exc
+    if response.status_code != 200:
+        raise AIServiceError(f"AI_HTTP_{response.status_code}", response.text[:200])
+    return response.json()

@@ -54,6 +54,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       AI_SERVICE_URL: http://fastapi:8001
       MEDIA_ROOT: /data/media
+      CAMERA_REDIS_URL: redis://redis:6379/2
     ports:
       - "8000:8000"
     volumes:
@@ -79,6 +80,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       AI_SERVICE_URL: http://fastapi:8001
       MEDIA_ROOT: /data/media
+      CAMERA_REDIS_URL: redis://redis:6379/2
     volumes:
       - media_data:/data/media   # 업로드 영상·카메라 녹화본을 django와 함께 사용
     depends_on:

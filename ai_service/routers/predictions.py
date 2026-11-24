@@ -52,3 +52,20 @@ async def predict_video_endpoint(request: Request, file: UploadFile = File(...))
     result["filename"] = file.filename
     result["file_bytes"] = size
     return result
+
+
+@router.post("/pose/frame")
+async def pose_frame_endpoint(request: Request, file: UploadFile = File(...)):
+    """IP Webcam 미리보기 위에 뼈대를 그리기 위한 사진 1장 관절 추출 (DB 저장 없음)."""
+    bundle = getattr(request.app.state, "bundle", None)
+    if bundle is None:
+        raise HTTPException(status_code=503, detail={"code": "MODEL_NOT_READY", "message": "모델이 아직 준비되지 않았습니다."})
+    data = await file.read(5 * 1024 * 1024 + 1)
+    if not data or len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail={"code": "BAD_IMAGE", "message": "5MB 이하 JPEG 한 장을 보내 주세요."})
+    from starlette.concurrency import run_in_threadpool
+    from services.frame_pose import pose_from_jpeg
+    try:
+        return await run_in_threadpool(pose_from_jpeg, data, bundle)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"code": "BAD_IMAGE", "message": str(exc)}) from exc

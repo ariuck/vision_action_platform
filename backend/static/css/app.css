@@ -35,11 +35,56 @@ form.inline { display: inline; }
 .steps li.on { background: var(--blue); color: #fff; }
 .stats { display: flex; gap: 24px; } .stats div { display: flex; flex-direction: column; } .stats strong { font-size: 26px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+/* 분석 화면 */
+.page-title { font-size: 26px; margin: 4px 0 14px; padding-left: 12px; border-left: 6px solid var(--blue); }
+.bar-title { padding-left: 10px; border-left: 4px solid var(--blue); }
+.analysis-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }
+.side .card { margin-bottom: 20px; }
+.stage-box { position: relative; background: #0f172a; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9;
+  display: flex; align-items: center; justify-content: center; }
+.stage-box video, .stage-box img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.camera-box img { object-fit: fill; }
+.stage-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.placeholder { color: #cbd5e1; font-size: 14px; padding: 16px; text-align: center; }
+.cam-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #e2e8f0; background: rgba(15, 23, 42, .75); font-size: 15px; padding: 16px; text-align: center; }
+.cam-state[hidden], .rec-badge[hidden], .countdown[hidden] { display: none; }
+.rec-badge { position: absolute; top: 10px; left: 10px; background: var(--red); color: #fff; font-weight: 700;
+  padding: 4px 10px; border-radius: 6px; font-size: 14px; }
+.countdown { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 96px; font-weight: 800; color: #fff; background: rgba(0, 0, 0, .35); }
+.cam-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.inline-label { display: flex; align-items: center; gap: 8px; margin: 0; }
+.inline-label select { width: auto; margin: 0; }
+.check { display: flex; align-items: center; gap: 6px; margin: 0; }
+.check input { width: auto; margin: 0; }
+.file-label { margin-top: 10px; }
+.start-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.primary.big { padding: 12px 28px; font-size: 16px; font-weight: 700; }
+.capture-info { color: var(--muted); font-size: 14px; }
+.flow { display: flex; justify-content: space-between; list-style: none; padding: 0; margin: 8px 0 12px; }
+.flow li { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; position: relative;
+  font-size: 13px; color: var(--muted); }
+.flow li:not(:last-child)::after { content: "→"; position: absolute; right: -8px; top: 6px; color: #94a3b8; }
+.flow .dot { width: 30px; height: 30px; border-radius: 50%; background: #e5e7eb; display: flex;
+  align-items: center; justify-content: center; color: #fff; font-size: 15px; }
+.flow li.done .dot { background: #64748b; } .flow li.done .dot::before { content: "✓"; }
+.flow li.active { color: var(--blue); font-weight: 700; }
+.flow li.active .dot { background: var(--blue); animation: pulse 1.2s infinite; }
+.flow li:last-child.done { color: #16a34a; font-weight: 700; } .flow li:last-child.done .dot { background: #16a34a; }
+.flow li.fail { color: var(--red); font-weight: 700; } .flow li.fail .dot { background: var(--red); }
+.flow li.fail .dot::before { content: "✕"; }
+.flow li.skip { opacity: .35; }
+@keyframes pulse { 50% { opacity: .5; } }
+.result-table th { background: #eef2ff; text-align: center; }
+.result-table tr.sub td { border-top: 0; padding-top: 0; }
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 .table-wrap .table { min-width: 640px; }
 .table td small { white-space: nowrap; }
 @media (max-width: 800px) {
-  .row, .grid2 { grid-template-columns: 1fr; }
+  .row, .grid2, .analysis-grid { grid-template-columns: 1fr; }
   .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
   .topbar nav { flex-wrap: wrap; gap: 10px; font-size: 14px; }
   .card { padding: 16px; }

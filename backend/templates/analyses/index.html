@@ -1,77 +1,111 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}AI 분석{% endblock %}
+{% block title %}Vision AI 동작 분석{% endblock %}
 {% block content %}
-<section class="card">
-  <h1>AI 동작 분석</h1>
-  <p class="muted">영상 속 사람마다 17개 이상행동 중 가장 가까운 동작과 Confidence를 보여 줍니다.
-    정상 행동은 학습하지 않았으므로 결과를 이상행동 확정으로 보지 마세요.</p>
+<h1 class="page-title">Vision AI 동작 분석</h1>
 
-  <div class="tabs" role="tablist">
-    <button type="button" class="tab active" data-tab="UPLOAD">영상 업로드</button>
-    <button type="button" class="tab" data-tab="CAMERA">IP Webcam</button>
-  </div>
+<div class="tabs" role="tablist">
+  <button type="button" class="tab active" data-tab="UPLOAD">영상 업로드</button>
+  <button type="button" class="tab" data-tab="CAMERA">IP Webcam</button>
+</div>
 
-  <form id="analysis-form" enctype="multipart/form-data">
-    {% csrf_token %}
-    <input type="hidden" name="input_type" value="UPLOAD">
-    <div class="pane" data-pane="UPLOAD">
-      <label>영상 파일 (MP4 등, 300MB 이하)
-        <input type="file" name="video_file" accept="video/*">
-      </label>
-    </div>
-    <div class="pane hidden" data-pane="CAMERA">
-      {% if cameras %}
-        <label>카메라
-          <select name="camera_name">{% for c in cameras %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+<form id="analysis-form" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="input_type" value="UPLOAD">
+  <div class="analysis-grid">
+    <section class="card">
+      <h2 class="bar-title" id="preview-title">영상 업로드 미리보기</h2>
+
+      <div class="pane" data-pane="UPLOAD">
+        <div class="stage-box">
+          <video id="upload-preview" controls muted playsinline hidden></video>
+          <p class="placeholder" id="upload-empty">영상 파일을 고르면 여기에서 미리 볼 수 있습니다.</p>
+        </div>
+        <label class="file-label">영상 파일 (MP4·MOV·AVI·MKV·WEBM, 300MB 이하)
+          <input type="file" name="video_file" id="video-file" accept="video/*">
         </label>
-        <p class="muted">‘AI 분석 시작’을 누르면 서버가 카메라에서 {{ capture_seconds|floatformat:0 }}초 동안 영상을 받습니다. 그 사이 카메라 앞에서 동작해 주세요.</p>
-      {% else %}
-        <p class="error">등록된 카메라가 없습니다. 관리자가 .env의 ALLOWED_CAMERAS에 카메라를 등록해야 합니다.</p>
-      {% endif %}
-    </div>
-    <div class="row">
-      <label>제목 (선택) <input type="text" name="title" maxlength="100"></label>
-      <label>수행한 동작 (선택, 비교용)
-        <select name="expected_action">
-          <option value="">선택 안 함</option>
-          {% for value, text in action_choices %}<option value="{{ value }}">{{ text }}</option>{% endfor %}
-        </select>
-      </label>
-    </div>
-    <button id="start-btn" class="primary" type="submit">AI 분석 시작</button>
-  </form>
-</section>
+      </div>
 
-<section class="card" id="current" hidden>
-  <h2>현재 작업 <span id="current-id"></span></h2>
-  <ol class="steps">
-    <li data-step="PENDING">대기</li><li data-step="STARTED">처리 중</li><li data-step="DONE">완료 / 실패</li>
-  </ol>
-  <p id="current-message" class="muted"></p>
-  <div id="current-result"></div>
-</section>
+      <div class="pane hidden" data-pane="CAMERA">
+        {% if cameras %}
+          <div class="stage-box camera-box">
+            <img id="cam-img" alt="IP Webcam 미리보기">
+            <canvas id="cam-overlay"></canvas>
+            <div id="cam-state" class="cam-state">카메라 연결 중…</div>
+            <div id="rec-badge" class="rec-badge" hidden>● 녹화 중 <span id="rec-left"></span></div>
+            <div id="countdown" class="countdown" hidden></div>
+          </div>
+          <div class="cam-tools">
+            {% if cameras|length > 1 %}
+              <label class="inline-label">카메라
+                <select name="camera_name" id="camera-name">{% for c in cameras %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+              </label>
+            {% else %}
+              <input type="hidden" name="camera_name" id="camera-name" value="{{ cameras.0 }}">
+              <span class="muted">카메라: {{ cameras.0 }}</span>
+            {% endif %}
+            <label class="check"><input type="checkbox" id="show-skeleton" checked> 뼈대 표시</label>
+          </div>
+        {% else %}
+          <div class="stage-box"><p class="placeholder error">등록된 카메라가 없습니다. 관리자가 .env의 ALLOWED_CAMERAS에 등록해야 합니다.</p></div>
+        {% endif %}
+      </div>
+
+      <div class="row">
+        <label>제목 (선택) <input type="text" name="title" maxlength="100"></label>
+        <label>수행한 동작 (선택, 결과 비교용)
+          <select name="expected_action">
+            <option value="">선택 안 함</option>
+            {% for value, text in action_choices %}<option value="{{ value }}">{{ text }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="start-row">
+        <button id="start-btn" class="primary big" type="submit">▶ AI 분석 시작</button>
+        <span class="capture-info hidden" id="capture-info">수집 시간 <strong>{{ capture_seconds|floatformat:0 }}초</strong> · 누르면 3초 뒤 녹화</span>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="card">
+        <h2 class="bar-title">분석 상태</h2>
+        <ol class="flow" id="flow">
+          <li data-step="QUEUED"><span class="dot"></span><span>대기</span></li>
+          <li data-step="CAPTURING"><span class="dot"></span><span>영상 수집</span></li>
+          <li data-step="ANALYZING"><span class="dot"></span><span>AI 분석</span></li>
+          <li data-step="DONE"><span class="dot"></span><span>완료</span></li>
+        </ol>
+        <p id="current-message" class="muted">분석을 시작하면 진행 단계가 여기에 표시됩니다.</p>
+      </section>
+      <section class="card">
+        <h2 class="bar-title">분석 결과 <small id="current-id" class="muted"></small></h2>
+        <div id="current-result"><p class="muted center">아직 결과가 없습니다.</p></div>
+      </section>
+    </div>
+  </div>
+</form>
 
 <section class="card">
-  <h2>최근 분석 이력</h2>
+  <h2 class="bar-title">최근 분석 이력</h2>
   <div class="table-wrap"><table class="table" id="history">
-    <thead><tr><th>#</th><th>입력</th><th>제목</th><th>상태</th><th>결과 (Track ID · 동작 · Confidence)</th><th>처리 시간</th><th></th></tr></thead>
+    <thead><tr><th>#</th><th>입력</th><th>제목</th><th>상태</th><th>결과 (Track ID · 동작 · 신뢰도)</th><th>처리 시간</th><th></th></tr></thead>
     <tbody>
     {% for job in jobs %}
-      <tr data-id="{{ job.id }}">
+      <tr>
         <td>{{ job.id }}</td>
         <td>{{ job.get_input_type_display }}</td>
         <td>{{ job.title|default:"-" }}{% if job.expected_action %}<br><small class="muted">수행: {{ job.get_expected_action_display }}</small>{% endif %}</td>
         <td><span class="badge {{ job.status|lower }}">{{ job.get_status_display }}</span></td>
         <td>
           {% for p in job.predictions.all %}
-            <div>ID {{ p.track_id }} · {{ p.action_name }} · {{ p.confidence|floatformat:2 }}{% if p.uncertain %} <span class="badge warn">판단 불확실</span>{% endif %}</div>
+            <div>ID {{ p.track_id }} · {{ p.action_name }} · {% widthratio p.confidence 1 100 %}%{% if p.uncertain %} <span class="badge warn">판단 불확실</span>{% endif %}</div>
           {% empty %}
             {% if job.status == "FAILURE" %}<span class="error">{{ job.error_message|truncatechars:60 }}</span>{% elif job.status == "SUCCESS" %}{{ job.message }}{% else %}-{% endif %}
           {% endfor %}
         </td>
         <td>{% if job.total_processing_sec %}{{ job.total_processing_sec|floatformat:1 }}초{% else %}-{% endif %}</td>
-        <td><button type="button" class="link" data-detail="{{ job.id }}">상세</button>
+        <td class="nowrap"><button type="button" class="link" data-detail="{{ job.id }}">상세</button>
             <button type="button" class="link danger" data-delete="{{ job.id }}">삭제</button></td>
       </tr>
     {% empty %}

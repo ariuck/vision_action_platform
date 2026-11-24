@@ -135,3 +135,5 @@ for item in env_list("ALLOWED_CAMERAS"):
         ALLOWED_CAMERAS[name.strip()] = url.strip()
 CAMERA_CAPTURE_SECONDS = float(os.getenv("CAMERA_CAPTURE_SECONDS", "8"))
 CAMERA_CONNECT_TIMEOUT = float(os.getenv("CAMERA_CONNECT_TIMEOUT", "10"))
+# 카메라 Frame을 미리보기·녹화가 함께 쓰도록 올려 두는 Redis (Celery 대기열과 다른 번호 사용)
+CAMERA_REDIS_URL = os.getenv("CAMERA_REDIS_URL", "redis://localhost:6379/2")

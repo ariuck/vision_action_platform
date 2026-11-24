@@ -158,7 +158,7 @@ class RunAnalysisTaskTests(TestCase):
     def test_success_saves_predictions(self, _):
         self.assertEqual(run_analysis.apply(args=[self.job.pk]).get(), "SUCCESS")
         self.job.refresh_from_db()
-        self.assertEqual(self.job.status, "SUCCESS")
+        self.assertEqual((self.job.status, self.job.stage), ("SUCCESS", "DONE"))
         self.assertEqual(self.job.predictions.count(), 2)
         self.assertTrue(self.job.predictions.get(track_id=2).uncertain)
         self.assertEqual(self.job.video_frames, 90)
@@ -168,7 +168,33 @@ class RunAnalysisTaskTests(TestCase):
         self.assertEqual(run_analysis.apply(args=[self.job.pk]).get(), "FAILURE")
         self.job.refresh_from_db()
         self.assertEqual((self.job.status, self.job.error_code), ("FAILURE", "AI_UNREACHABLE"))
+        self.assertEqual(self.job.stage, "FAILED")
         self.assertIsNotNone(self.job.finished_at)
+
+
+@override_settings(ALLOWED_CAMERAS={"phone": "http://cam.test/video"})
+class CameraViewTests(TestCase):
+    def setUp(self):
+        User.objects.create_user("erin", password="pw-erin-123")
+
+    def test_camera_pages_need_login(self):
+        res = self.client.get(reverse("analyses:camera_status", args=["phone"]))
+        self.assertEqual(res.status_code, 302)
+
+    def test_unknown_camera_is_404(self):
+        # 등록 안 된 이름으로 다른 주소에 접속시키지 못하게 막는다
+        self.client.login(username="erin", password="pw-erin-123")
+        for view in ("camera_stream", "camera_status", "camera_pose"):
+            self.assertEqual(self.client.get(reverse(f"analyses:{view}", args=["other"])).status_code, 404)
+
+    @mock.patch("analyses.camera_views.camera_hub")
+    def test_status_reports_live(self, hub):
+        hub.latest.return_value = (3, b"jpg")
+        hub.last_error.return_value = None
+        self.client.login(username="erin", password="pw-erin-123")
+        res = self.client.get(reverse("analyses:camera_status", args=["phone"]))
+        self.assertEqual(res.json(), {"live": True, "error": None})
+        hub.keep_alive.assert_called_once_with("phone")
 
 
 class PageTests(TestCase):

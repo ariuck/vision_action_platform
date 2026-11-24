@@ -31,10 +31,10 @@ class AnalysisJobSerializer(serializers.ModelSerializer):
         model = AnalysisJob
         fields = ["id", "username", "title", "memo", "input_type", "input_type_display", "video_file",
                   "camera_name", "capture_seconds", "expected_action", "expected_action_display", "status",
-                  "status_display", "celery_task_id", "result_code", "message", "error_code", "error_message",
+                  "status_display", "stage", "celery_task_id", "result_code", "message", "error_code", "error_message",
                   "video_fps", "video_frames", "video_duration_sec", "ai_processing_sec", "total_processing_sec",
                   "created_at", "started_at", "finished_at", "predictions"]
-        read_only_fields = ["status", "celery_task_id", "result_code", "message", "error_code", "error_message",
+        read_only_fields = ["status", "stage", "celery_task_id", "result_code", "message", "error_code", "error_message",
                             "video_fps", "video_frames", "video_duration_sec", "ai_processing_sec",
                             "total_processing_sec", "created_at", "started_at", "finished_at", "capture_seconds"]
         extra_kwargs = {"video_file": {"required": False}}
@@ -69,9 +69,16 @@ class AnalysisJobUpdateSerializer(serializers.ModelSerializer):
 
 class AnalysisStatusSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    stage_display = serializers.CharField(source="get_stage_display", read_only=True)
     is_finished = serializers.BooleanField(read_only=True)
+    server_time = serializers.SerializerMethodField()  # 녹화 남은 시간을 서버 시계 기준으로 계산하기 위해
 
     class Meta:
         model = AnalysisJob
-        fields = ["id", "status", "status_display", "is_finished", "result_code", "message", "error_code",
-                  "error_message", "started_at", "finished_at"]
+        fields = ["id", "input_type", "status", "status_display", "stage", "stage_display", "is_finished",
+                  "capture_seconds", "capture_started_at", "server_time", "result_code", "message",
+                  "error_code", "error_message", "started_at", "finished_at"]
+
+    def get_server_time(self, obj):
+        from django.utils import timezone
+        return timezone.now().isoformat()
