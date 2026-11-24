@@ -19,3 +19,6 @@ backend/staticfiles/
 *.mp4
 *.avi
 *.mov
+
+# 학습 Feature 캐시 (원본 데이터에서 다시 만들 수 있음)
+training/cache/
