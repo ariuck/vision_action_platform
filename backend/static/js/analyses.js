@@ -50,6 +50,9 @@
     const state = $("cam-state");
     const nameEl = $("camera-name");
     const BONES = [[5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
+    // 머리: 코(0)·왼눈(1)·오른눈(2)·왼귀(3)·오른귀(4). 모델도 이 점들을 쓴다 (코 높이는 중요 Feature 상위 10개).
+    const FACE = [[0, 1], [0, 2], [1, 3], [2, 4]];
+    const HEAD_COLOR = "#facc15";
     let running = false;
     let loopId = 0;
 
@@ -81,7 +84,37 @@
           ctx.fill();
           ctx.stroke();
         });
+        drawHead(k, W, H);
       });
+    }
+
+    // 목(코 ~ 두 어깨 가운데) + 얼굴 선 + 머리 점 5개를 노란색으로
+    function drawHead(k, W, H) {
+      const line = (x1, y1, x2, y2) => {
+        ctx.beginPath();
+        ctx.moveTo(x1 * W, y1 * H);
+        ctx.lineTo(x2 * W, y2 * H);
+        ctx.stroke();
+      };
+      ctx.strokeStyle = HEAD_COLOR;
+      ctx.lineWidth = 2;
+      if (k[0][2] >= 0.4 && k[5][2] >= 0.4 && k[6][2] >= 0.4) {
+        line(k[0][0], k[0][1], (k[5][0] + k[6][0]) / 2, (k[5][1] + k[6][1]) / 2);
+      }
+      FACE.forEach(([a, b]) => {
+        if (k[a][2] >= 0.4 && k[b][2] >= 0.4) line(k[a][0], k[a][1], k[b][0], k[b][1]);
+      });
+      ctx.fillStyle = HEAD_COLOR;
+      k.slice(0, 5).forEach(([x, y, c], i) => {
+        if (c < 0.4) return;
+        ctx.beginPath();
+        ctx.arc(x * W, y * H, i === 0 ? 5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // 다음 사람의 몸통은 다시 원래 색으로
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#2dd4bf";
+      ctx.lineWidth = 3;
     }
 
     async function statusLoop(id) {
