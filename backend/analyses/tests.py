@@ -233,6 +233,36 @@ class CameraViewTests(TestCase):
         hub.keep_alive.assert_called_once_with("phone")
 
 
+class CameraSaveTests(TestCase):
+    """카메라 녹화 저장: 110fps처럼 많이 들어와도 MP4가 만들어져야 한다 (2026-11-25 실패 재현)."""
+
+    def _jpgs(self, n):
+        import cv2
+        import numpy as np
+        frame = np.zeros((48, 64, 3), np.uint8)
+        ok, buf = cv2.imencode(".jpg", frame)
+        return [buf.tobytes()] * n
+
+    def test_high_fps_is_saved_at_60(self):
+        from pathlib import Path
+
+        from .camera_hub import write_mp4
+        out = Path(tempfile.mkdtemp()) / "clip.mp4"
+        info = write_mp4(self._jpgs(884), 8.0, out)   # 110.5fps로 들어온 경우
+        self.assertTrue(out.exists() and out.stat().st_size > 0)
+        self.assertEqual(info["fps"], 60)
+        self.assertAlmostEqual(info["frames"], 480, delta=2)
+        self.assertEqual(info["received_fps"], 110.5)
+
+    def test_normal_fps_kept(self):
+        from pathlib import Path
+
+        from .camera_hub import write_mp4
+        out = Path(tempfile.mkdtemp()) / "clip.mp4"
+        info = write_mp4(self._jpgs(240), 8.0, out)   # 30fps
+        self.assertEqual((info["fps"], info["frames"]), (30, 240))
+
+
 class PageTests(TestCase):
     def test_index_requires_login(self):
         res = self.client.get(reverse("analyses:index"))

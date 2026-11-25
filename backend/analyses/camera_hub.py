@@ -148,14 +148,37 @@ def capture_clip(name: str, seconds: float, out_path, on_start=None) -> dict:
     elapsed = time.monotonic() - started
     if not jpgs:
         raise CameraError("CAMERA_NO_FRAME", "카메라에서 영상이 들어오지 않았습니다.")
+    return write_mp4(jpgs, elapsed, out_path)
 
+
+MAX_SAVE_FPS = 60  # 학습 영상이 60fps. 이보다 많이 들어오면 시간 간격을 맞춰 솎아낸다.
+
+
+def write_mp4(jpgs: list[bytes], elapsed: float, out_path) -> dict:
+    """받은 JPEG들을 MP4로 저장한다.
+
+    - 저장 fps는 정수로 맞춘다. mp4v(MPEG-4)는 fps를 1000분의 1 단위 분수로 적는데 분모 한계(65535)가 있어서,
+      110.4fps 같은 값은 파일이 아예 만들어지지 않았다 (2026-11-25 카메라 #38·#39 실패 원인).
+    - 60fps보다 많이 들어오면 시간 간격을 고르게 60fps로 솎아낸다.
+    - 저장에 실패하면 바로 CAMERA_SAVE_FAILED로 알린다 (예전에는 다음 단계에서 '파일 없음'으로만 보였다).
+    """
     import numpy as np
+
+    real_fps = len(jpgs) / elapsed
+    if real_fps > MAX_SAVE_FPS:
+        keep = np.unique(np.floor(np.arange(0, len(jpgs), real_fps / MAX_SAVE_FPS)).astype(int))
+        jpgs = [jpgs[i] for i in keep]
+    fps = max(1, round(len(jpgs) / elapsed))
     first = cv2.imdecode(np.frombuffer(jpgs[0], np.uint8), cv2.IMREAD_COLOR)
     height, width = first.shape[:2]
-    fps = len(jpgs) / elapsed
     out_path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+    if not writer.isOpened():
+        raise CameraError("CAMERA_SAVE_FAILED", f"녹화한 영상을 저장하지 못했습니다 ({fps}fps, {width}x{height}).")
     for jpg in jpgs:
         writer.write(cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR))
     writer.release()
-    return {"frames": len(jpgs), "fps": round(fps, 2), "seconds": round(elapsed, 2), "width": width, "height": height}
+    if not out_path.exists() or out_path.stat().st_size == 0:
+        raise CameraError("CAMERA_SAVE_FAILED", "녹화한 영상 파일이 만들어지지 않았습니다.")
+    return {"frames": len(jpgs), "fps": fps, "received_fps": round(real_fps, 1), "seconds": round(elapsed, 2),
+            "width": width, "height": height}

@@ -176,16 +176,27 @@
   });
 
   // ---------------- 분석 상태 표시 ----------------
-  function setFlow(stage, inputType) {
+  // 실패한 단계: 오류 코드로 정한다 (카메라·영상 파일 문제 = 영상 수집, AI 서버 문제 = AI 분석, 대기열 = 대기)
+  function failedStep(errorCode, inputType) {
+    const code = errorCode || "";
+    if (code.startsWith("CAMERA") || code === "VIDEO_MISSING" || code === "NO_VIDEO") return inputType === "UPLOAD" ? 0 : 1;
+    if (code === "QUEUE_UNAVAILABLE") return 0;
+    if (code) return 2;
+    return Math.max(lastReached, 0);
+  }
+
+  function setFlow(stage, inputType, errorCode) {
     currentStage = stage;
     const failed = stage === "FAILED";
-    const reached = failed ? lastReached : STEPS.indexOf(stage);
+    const reached = failed ? failedStep(errorCode, inputType) : STEPS.indexOf(stage);
     if (!failed) lastReached = reached;
     $("flow").querySelectorAll("li").forEach((li, i) => {
       const step = li.dataset.step;
       li.className = "";
       if (step === "CAPTURING" && inputType === "UPLOAD") li.classList.add("skip");
-      else if (failed && i === reached + 1) li.classList.add("fail");
+      // 실패하면 마지막으로 진행 중이던 단계에 ✕ (영상 수집 중 실패면 영상 수집에)
+      else if (failed && i === reached) li.classList.add("fail");
+      else if (failed && i > reached) { /* 아직 안 간 단계는 회색 */ }
       else if (i < reached || (i === reached && stage === "DONE")) li.classList.add("done");
       else if (i === reached) li.classList.add("active");
     });
@@ -256,7 +267,7 @@
       const res = await api(`/api/analyses/${id}/status/`);
       if (!res.ok) return;
       const s = await res.json();
-      setFlow(s.stage, s.input_type);
+      setFlow(s.stage, s.input_type, s.error_code);
       showRecording(s);
       $("current-message").textContent = s.is_finished
         ? (s.status === "SUCCESS" ? (s.message || "분석이 끝났습니다.") : "분석에 실패했습니다.")
@@ -343,8 +354,7 @@
     if (detailId) {
       const job = await (await api(`/api/analyses/${detailId}/`)).json();
       $("current-id").textContent = `#${detailId}`;
-      lastReached = job.status === "FAILURE" ? 0 : lastReached;
-      setFlow(job.stage, job.input_type);
+      setFlow(job.stage, job.input_type, job.error_code);
       $("current-message").textContent = job.message || "";
       renderResult(job);
       if (!["SUCCESS", "FAILURE"].includes(job.status)) poll(detailId);
