@@ -98,6 +98,10 @@ class PersonPrediction(models.Model):
     motion_level = models.FloatField("움직임 크기", null=True, blank=True)
     height_ratio = models.FloatField("키/화면 높이", null=True, blank=True)
     top3 = models.JSONField(default=list, blank=True)
+    action_group = models.CharField("묶음", max_length=20, blank=True, db_index=True)  # 예: 눕기·쓰러짐
+    group_scores = models.JSONField("묶음별 확률", default=dict, blank=True)           # 같은 묶음 동작 확률의 합
+    action_start_sec = models.FloatField("동작 구간 시작", null=True, blank=True)       # 모델에 넣은 구간
+    action_end_sec = models.FloatField("동작 구간 끝", null=True, blank=True)
     frames = models.IntegerField("보인 Frame 수", default=0)
     valid_frames = models.IntegerField("예측에 쓴 Frame 수", default=0)
     first_sec = models.FloatField(null=True, blank=True)

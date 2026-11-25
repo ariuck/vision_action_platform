@@ -86,6 +86,8 @@ def run_analysis(self, job_id: int) -> str:
                 action_name=p["action_name"], confidence=p["confidence"], uncertain=p["uncertain"],
                 no_action=p.get("no_action", False), is_main=p.get("is_main", True),
                 motion_level=p.get("motion_level"), height_ratio=p.get("height_ratio"),
+                action_group=p.get("action_group", ""), group_scores=p.get("group_scores", {}),
+                action_start_sec=p.get("action_start_sec"), action_end_sec=p.get("action_end_sec"),
                 top3=p.get("top3", []), frames=p.get("frames", 0), valid_frames=p.get("valid_frames", 0),
                 first_sec=p.get("first_sec"), last_sec=p.get("last_sec"))
             for p in result.get("predictions", [])

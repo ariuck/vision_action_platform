@@ -2,12 +2,12 @@
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count
 from django.shortcuts import render
 
 from .actions import ACTION_CHOICES, ACTIONS
 from .camera_registry import all_cameras
-from .models import AnalysisJob, PersonPrediction
+from .models import AnalysisJob
+from .stats import dashboard_stats, user_summary
 
 
 @login_required
@@ -18,34 +18,16 @@ def index(request):
         "cameras": list(all_cameras()),
         "capture_seconds": settings.CAMERA_CAPTURE_SECONDS,
         "action_choices": ACTION_CHOICES,
+        "summary": user_summary(request.user),
+        "action_groups": {label: group for _, label, _, group in ACTIONS},
     })
 
 
 @staff_member_required
 def dashboard(request):
     # 차트 숫자는 Django ORM 집계로 만든다 (FastAPI는 DB에 접근하지 않음).
-    # 배경 인물은 빼고 주인공 예측만 센다
-    by_action = dict(PersonPrediction.objects.filter(is_main=True, no_action=False)
-                     .values_list("action_label").annotate(n=Count("id")))
-    by_status = dict(AnalysisJob.objects.values_list("status").annotate(n=Count("id")))
-    by_input = dict(AnalysisJob.objects.values_list("input_type").annotate(n=Count("id")))
-    avg_sec = dict(AnalysisJob.objects.filter(status=AnalysisJob.Status.SUCCESS)
-                   .values_list("input_type").annotate(s=Avg("total_processing_sec")))
-    chart = {
-        "actions": {"labels": [f"{aid} {name}" for aid, _, name, _ in ACTIONS],
-                    "values": [by_action.get(label, 0) for _, label, _, _ in ACTIONS]},
-        "status": {"labels": [s.label for s in AnalysisJob.Status],
-                   "values": [by_status.get(s.value, 0) for s in AnalysisJob.Status]},
-        "input": {"labels": [t.label for t in AnalysisJob.InputType],
-                  "values": [by_input.get(t.value, 0) for t in AnalysisJob.InputType],
-                  "avg_sec": [round(avg_sec.get(t.value) or 0, 1) for t in AnalysisJob.InputType]},
-    }
+    stats = dashboard_stats()
     recent = AnalysisJob.objects.select_related("user").prefetch_related("predictions")[:15]
     return render(request, "analyses/dashboard.html", {
-        "chart": chart, "recent": recent,
-        "total_jobs": AnalysisJob.objects.count(),
-        "total_predictions": PersonPrediction.objects.count(),
-        "uncertain": PersonPrediction.objects.filter(uncertain=True, is_main=True).count(),
-        "no_action": PersonPrediction.objects.filter(no_action=True, is_main=True).count(),
-        "background": PersonPrediction.objects.filter(is_main=False).count(),
+        "kpi": stats["kpi"], "labeled": stats["labeled"], "chart": stats["chart"], "recent": recent,
     })

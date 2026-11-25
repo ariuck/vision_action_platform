@@ -23,7 +23,8 @@ FAKE_RESULT = {
     "video": {"fps": 30.0, "frames": 90, "duration_sec": 3.0},
     "predictions": [
         {"track_id": 1, "action_id": "A007", "action_label": "sit_floor", "action_name": "바닥에 앉기",
-         "confidence": 0.72, "uncertain": False, "frames": 90, "valid_frames": 88, "first_sec": 0.0,
+         "action_group": "앉기", "group_scores": {"앉기": 0.85, "눕기·쓰러짐": 0.1},
+         "action_start_sec": 0.5, "action_end_sec": 2.8, "confidence": 0.72, "uncertain": False, "frames": 90, "valid_frames": 88, "first_sec": 0.0,
          "last_sec": 3.0, "top3": [{"action_label": "sit_floor", "action_name": "바닥에 앉기", "confidence": 0.72}]},
         {"track_id": 2, "action_id": "A016", "action_label": "fall_backward", "action_name": "뒤로 넘어지기",
          "confidence": 0.15, "uncertain": True, "is_main": False, "no_action": False,
@@ -165,6 +166,8 @@ class RunAnalysisTaskTests(TestCase):
         # 배경 인물 표시가 저장되고, 예전 응답처럼 값이 없으면 주인공으로 본다
         self.assertFalse(self.job.predictions.get(track_id=2).is_main)
         self.assertTrue(self.job.predictions.get(track_id=1).is_main)
+        p1 = self.job.predictions.get(track_id=1)
+        self.assertEqual((p1.action_group, p1.group_scores["앉기"], p1.action_start_sec), ("앉기", 0.85, 0.5))
         self.assertEqual(self.job.video_frames, 90)
 
     @mock.patch("analyses.tasks.request_prediction", side_effect=AIServiceError("AI_UNREACHABLE", "연결 실패"))
@@ -261,6 +264,41 @@ class CameraSaveTests(TestCase):
         out = Path(tempfile.mkdtemp()) / "clip.mp4"
         info = write_mp4(self._jpgs(240), 8.0, out)   # 30fps
         self.assertEqual((info["fps"], info["frames"]), (30, 240))
+
+
+@override_settings(MEDIA_ROOT=TMP_MEDIA)
+class StatsTests(TestCase):
+    """화면·대시보드 통계: 수행한 동작과 대표 예측(가장 오래 보인 주인공) 비교"""
+
+    def setUp(self):
+        self.user = User.objects.create_user("gina", password="pw-gina-123")
+
+    def job(self, expected, preds):
+        j = AnalysisJob.objects.create(user=self.user, input_type="UPLOAD", video_file=video(), status="SUCCESS",
+                                       expected_action=expected, total_processing_sec=10.0)
+        for i, (label, frames, main) in enumerate(preds, 1):
+            PersonPrediction.objects.create(job=j, track_id=i, action_id="A000", action_label=label,
+                                            action_name=label, confidence=0.4, frames=frames, is_main=main)
+        return j
+
+    def test_labeled_accuracy_uses_longest_main_person(self):
+        from .stats import labeled_accuracy, user_summary
+        self.job("front_kick", [("front_kick", 300, True), ("throw_one_hand", 100, True)])   # 맞음
+        self.job("push", [("grab_shake", 200, True), ("push", 400, False)])                  # 배경이 맞아도 틀림
+        acc = labeled_accuracy(AnalysisJob.objects.prefetch_related("predictions"))
+        self.assertEqual((acc["n"], acc["ok"], acc["acc"]), (2, 1, 50.0))
+        self.assertEqual(acc["pairs"][0], {"truth": "밀치기", "pred": "grab_shake", "count": 1})
+        s = user_summary(self.user)
+        self.assertEqual((s["total"], s["success_rate"], s["labeled_acc"]), (2, 100.0, 50.0))
+
+    def test_dashboard_stats_shape(self):
+        from .stats import dashboard_stats
+        self.job("", [("sit_floor", 100, True)])
+        d = dashboard_stats()
+        self.assertEqual(len(d["chart"]["actions"]["values"]), 17)
+        self.assertEqual(len(d["chart"]["daily"]["labels"]), 14)
+        self.assertEqual(sum(d["chart"]["conf_hist"]["values"]), 1)
+        self.assertEqual(d["kpi"]["people"], 1)
 
 
 class PageTests(TestCase):

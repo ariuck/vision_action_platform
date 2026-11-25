@@ -52,6 +52,12 @@ def predict_video(path: str, bundle) -> dict:
         order = np.argsort(proba)[::-1]
         top3 = [{"action_label": str(classes[j]), "action_name": bundle.actions[classes[j]]["action_name"],
                  "confidence": round(float(proba[j]), 4)} for j in order[:3]]
+        # 묶음(그룹)별 확률 = 같은 묶음 동작들의 확률 합 (예: 눕기·쓰러짐 = 앞으로 눕기 + 뒤로 눕기 + 쓰러지기 3개)
+        groups: dict[str, float] = {}
+        for c, pr in zip(classes, proba):
+            g = bundle.actions[str(c)].get("group", "")
+            groups[g] = groups.get(g, 0.0) + float(pr)
+        group_scores = {g: round(v, 4) for g, v in sorted(groups.items(), key=lambda kv: -kv[1])}
         if quality["no_action"]:
             # 거의 안 움직였으면 17개 중 억지로 고르지 않는다 (모델 후보는 참고용으로만 남김)
             result = {"action_id": "-", "action_label": NO_ACTION_LABEL, "action_name": "동작 없음(정상)",
@@ -64,7 +70,7 @@ def predict_video(path: str, bundle) -> dict:
                       "action_group": action.get("group", ""), "confidence": round(conf, 4),
                       "uncertain": conf < UNCERTAIN_BELOW}
         predictions.append({
-            "track_id": tid, **result, "top3": top3,
+            "track_id": tid, **result, "top3": top3, "group_scores": group_scores,
             "no_action": quality["no_action"],
             "is_main": quality["is_main"],
             "motion_level": quality["motion_level"],

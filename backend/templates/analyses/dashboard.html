@@ -2,31 +2,64 @@
 {% load static %}
 {% block title %}관리자 대시보드{% endblock %}
 {% block content %}
-<section class="card">
-  <h1>관리자 대시보드</h1>
-  <div class="stats">
-    <div><strong>{{ total_jobs }}</strong><span>전체 분석 작업</span></div>
-    <div><strong>{{ total_predictions }}</strong><span>사람별 예측</span></div>
-    <div><strong>{{ uncertain }}</strong><span>판단 불확실</span></div>
-    <div><strong>{{ no_action }}</strong><span>동작 없음</span></div>
-    <div><strong>{{ background }}</strong><span>배경 인물(제외)</span></div>
+<h1 class="page-title">관리자 대시보드</h1>
+
+<section class="kpis" aria-label="핵심 숫자">
+  <div class="kpi"><span class="kpi-label">전체 분석 작업</span><strong>{{ kpi.total }}건</strong><span class="sub">오늘 {{ kpi.today }}건 · 사용자 {{ kpi.users }}명</span></div>
+  <div class="kpi"><span class="kpi-label">성공률</span><strong>{% if kpi.success_rate is not None %}{{ kpi.success_rate|floatformat:0 }}%{% else %}-{% endif %}</strong><span class="sub">실패 {{ kpi.failure }}건</span></div>
+  <div class="kpi"><span class="kpi-label">평균 처리 시간 (완료)</span><strong>{% if kpi.avg_total_sec %}{{ kpi.avg_total_sec|floatformat:1 }}초{% else %}-{% endif %}</strong><span class="sub">AI 추론 {% if kpi.avg_ai_sec %}{{ kpi.avg_ai_sec|floatformat:1 }}초{% else %}-{% endif %}</span></div>
+  <div class="kpi"><span class="kpi-label">분석한 사람 (주인공)</span><strong>{{ kpi.people }}명</strong><span class="sub">동작 없음 {{ kpi.no_action }} · 배경 제외 {{ kpi.background }}</span></div>
+  <div class="kpi"><span class="kpi-label">평균 신뢰도</span><strong>{% if kpi.avg_conf %}{% widthratio kpi.avg_conf 1 100 %}%{% else %}-{% endif %}</strong><span class="sub">판단 불확실 {% if kpi.uncertain_rate is not None %}{{ kpi.uncertain_rate|floatformat:0 }}%{% else %}-{% endif %}</span></div>
+  <div class="kpi"><span class="kpi-label">정답 일치율</span><strong>{% if kpi.labeled_acc is not None %}{{ kpi.labeled_acc|floatformat:0 }}%{% else %}-{% endif %}</strong><span class="sub">수행 동작을 고른 {{ kpi.labeled_n }}건 기준</span></div>
+</section>
+
+<section class="card"><h2 class="bar-title">날짜별 분석 수 (최근 14일)</h2><div class="chart-box short"><canvas id="dailyChart"></canvas></div></section>
+
+<section class="grid2">
+  <div class="card"><h2 class="bar-title">동작별 예측 건수</h2><div class="chart-box tall"><canvas id="actionChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">동작별 평균 신뢰도</h2><div class="chart-box tall"><canvas id="confChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">작업 상태별 건수</h2><div class="chart-box"><canvas id="statusChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">묶음별 예측 건수</h2><div class="chart-box"><canvas id="groupChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">신뢰도 분포</h2><p class="muted">17개 동작이라 확률이 나뉘어 원래 낮게 나온다. 20% 미만은 '판단 불확실'.</p><div class="chart-box short"><canvas id="histChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">실패 원인</h2><div class="chart-box short"><canvas id="reasonChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">입력 방식별 작업 수</h2><div class="chart-box short"><canvas id="inputChart"></canvas></div></div>
+  <div class="card"><h2 class="bar-title">입력 방식별 평균 처리 시간 (초)</h2><div class="chart-box short"><canvas id="timeChart"></canvas></div></div>
+</section>
+
+<section class="grid2">
+  <div class="card">
+    <h2 class="bar-title">동작별 정답 일치 (수행 동작을 고른 작업)</h2>
+    {% if labeled.table %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>수행한 동작</th><th>건수</th><th>일치</th><th>일치율</th><th>대신 나온 답</th></tr></thead>
+      <tbody>{% for r in labeled.table %}
+        <tr><td>{{ r.name }}</td><td>{{ r.n }}</td><td>{{ r.ok }}</td><td>{{ r.acc|floatformat:0 }}%</td><td class="muted">{{ r.often|default:"-" }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="muted">아직 '수행한 동작'을 고른 분석이 없습니다. 분석할 때 동작을 고르면 여기서 정확도를 볼 수 있습니다.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2 class="bar-title">자주 헷갈린 동작</h2>
+    {% if labeled.pairs %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>수행한 동작</th><th>예측</th><th>횟수</th></tr></thead>
+      <tbody>{% for p in labeled.pairs %}<tr><td>{{ p.truth }}</td><td>{{ p.pred }}</td><td>{{ p.count }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="muted">틀린 기록이 아직 없습니다.</p>{% endif %}
   </div>
 </section>
-<section class="grid2">
-  <div class="card"><h2>동작별 예측 건수</h2><canvas id="actionChart" height="320"></canvas></div>
-  <div class="card"><h2>작업 상태별 건수</h2><canvas id="statusChart" height="320"></canvas></div>
-  <div class="card"><h2>입력 방식별 건수</h2><canvas id="inputChart" height="220"></canvas></div>
-  <div class="card"><h2>입력 방식별 평균 처리 시간 (초, 완료 작업)</h2><canvas id="timeChart" height="220"></canvas></div>
-</section>
+
 <section class="card">
-  <h2>최근 작업 (전체 사용자)</h2>
+  <h2 class="bar-title">최근 작업 (전체 사용자)</h2>
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>#</th><th>사용자</th><th>입력</th><th>상태</th><th>결과</th><th>생성</th></tr></thead>
+    <thead><tr><th>#</th><th>사용자</th><th>입력</th><th>상태</th><th>결과 (주인공)</th><th>수행 동작</th><th>처리 시간</th><th>생성</th></tr></thead>
     <tbody>
     {% for job in recent %}
       <tr><td>{{ job.id }}</td><td>{{ job.user.username }}</td><td>{{ job.get_input_type_display }}</td>
         <td><span class="badge {{ job.status|lower }}">{{ job.get_status_display }}</span></td>
-        <td>{% for p in job.predictions.all %}ID {{ p.track_id }} {{ p.action_name }} ({{ p.confidence|floatformat:2 }}) {% empty %}{{ job.error_code|default:job.message|default:"-" }}{% endfor %}</td>
+        <td>{% for p in job.predictions.all %}{% if p.is_main %}<div>ID {{ p.track_id }} {{ p.action_name }}{% if not p.no_action %} ({% widthratio p.confidence 1 100 %}%){% endif %}</div>{% endif %}{% empty %}<span class="muted">{{ job.error_code|default:job.message|default:"-" }}</span>{% endfor %}</td>
+        <td class="muted">{{ job.get_expected_action_display|default:"-" }}</td>
+        <td>{% if job.total_processing_sec %}{{ job.total_processing_sec|floatformat:1 }}초{% else %}-{% endif %}</td>
         <td>{{ job.created_at|date:"m-d H:i" }}</td></tr>
     {% endfor %}
     </tbody>

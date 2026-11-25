@@ -13,6 +13,7 @@
   const api = (url, options = {}) =>
     fetch(url, { credentials: "same-origin", ...options, headers: { "X-CSRFToken": csrf, ...(options.headers || {}) } });
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ACTION_GROUPS = JSON.parse($("action-groups")?.textContent || "{}");  // 동작 → 묶음
 
   let mode = "UPLOAD";
   let currentStage = null;
@@ -275,9 +276,18 @@
       box.innerHTML = `<p>${esc(job.message || "예측 결과가 없습니다.")}</p>`;
       return;
     }
+    // 묶음: 같은 묶음 동작 확률의 합 (예: 눕기·쓰러짐 52%) — 세부 동작이 헷갈려도 큰 방향은 맞는지 보여 준다
+    const groupLine = (p) => {
+      if (p.no_action || !p.action_group) return "";
+      const gs = p.group_scores || {};
+      const pct = gs[p.action_group] != null ? Math.round(gs[p.action_group] * 100) : null;
+      return `<div class="group-line">묶음: <strong>${esc(p.action_group)}</strong>${pct != null
+        ? ` ${pct}%<span class="group-bar" style="width:${Math.max(4, pct * 0.8)}px"></span>` : ""}</div>`;
+    };
+    const span = (p) => p.action_start_sec != null ? ` · 판단 구간 ${p.action_start_sec}~${p.action_end_sec}초` : "";
     const row = (p) => `
       <tr><td class="center">${p.track_id}</td>
-      <td><strong>${esc(p.action_name)}</strong><br><small class="muted">${p.no_action ? "움직임이 거의 없어 예측하지 않음" : `${esc(p.action_id)} ${esc(p.action_label)}`} · ${p.first_sec}~${p.last_sec}초</small></td>
+      <td><strong>${esc(p.action_name)}</strong>${groupLine(p)}<small class="muted">${p.no_action ? "움직임이 거의 없어 예측하지 않음" : `${esc(p.action_id)} ${esc(p.action_label)}`} · 보인 시간 ${p.first_sec}~${p.last_sec}초${span(p)}</small></td>
       <td class="center">${p.no_action ? '<span class="badge">정상</span>' : `<strong>${Math.round(p.confidence * 100)}%</strong>`}${p.uncertain ? '<br><span class="badge warn">판단 불확실</span>' : ""}</td></tr>
       <tr class="sub"><td></td><td colspan="2"><small class="muted">${p.no_action ? "참고 후보" : "후보"}: ${p.top3.map((t) => `${esc(t.action_name)} ${Math.round(t.confidence * 100)}%`).join(" · ")}</small></td></tr>`;
     const main = job.predictions.filter((p) => p.is_main);
@@ -290,9 +300,26 @@
       ? `<details class="bg-people"><summary>배경 인물 ${bg.length}명 (화면 끝에 걸치거나 다리가 가려져 결과에서 제외)</summary>
          <div class="table-wrap"><table class="table result-table">${head}<tbody>${bg.map(row).join("")}</tbody></table></div></details>`
       : "";
-    const expected = job.expected_action ? `<p class="muted">수행한 동작(직접 선택): ${esc(job.expected_action_display)}</p>` : "";
-    box.innerHTML = `${mainTable}${bgTable}${expected}
-      <p class="muted">영상 ${job.video_duration_sec ?? "-"}초 · AI 추론 ${job.ai_processing_sec ?? "-"}초 · 전체 ${job.total_processing_sec ?? "-"}초</p>`;
+    // 수행한 동작을 골랐으면 대표 예측(가장 오래 보인 주인공)과 비교: 일치 / 같은 묶음 / 다름
+    let expected = "";
+    if (job.expected_action) {
+      const rep = main.slice().sort((a, b) => b.frames - a.frames)[0];
+      let badge = "";
+      if (rep) {
+        if (rep.action_label === job.expected_action) badge = '<span class="match ok">일치</span>';
+        else if (rep.action_group && ACTION_GROUPS[job.expected_action] === rep.action_group) badge = '<span class="match near">같은 묶음</span>';
+        else badge = '<span class="match no">다름</span>';
+      }
+      expected = `<p>수행한 동작(직접 선택): <strong>${esc(job.expected_action_display)}</strong>${badge}</p>`;
+    }
+    const chip = (t) => `<span class="chip">${t}</span>`;
+    const fmt = (v, unit) => (v == null ? "-" : `${Math.round(v * 10) / 10}${unit}`);
+    const chips = [
+      chip(`영상 ${fmt(job.video_duration_sec, "초")}`), chip(`${fmt(job.video_fps, "fps")}`),
+      chip(`주인공 ${main.length}명${bg.length ? ` · 배경 ${bg.length}명` : ""}`),
+      chip(`AI 추론 ${fmt(job.ai_processing_sec, "초")}`), chip(`전체 ${fmt(job.total_processing_sec, "초")}`),
+    ].join("");
+    box.innerHTML = `${expected}${mainTable}${bgTable}<div class="chips">${chips}</div>`;
   }
 
   async function poll(id) {
