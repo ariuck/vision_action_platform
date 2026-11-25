@@ -197,7 +197,7 @@ class CameraViewTests(TestCase):
     def test_register_camera_from_screen(self):
         self.client.login(username="erin", password="pw-erin-123")
         url = reverse("analyses:camera_list")
-        ok = self.client.post(url, {"name": "계산대폰", "ip": "192.168.40.20", "port": 4747, "path": "/video"},
+        ok = self.client.post(url, {"name": "계산대폰", "ip": "192.168.0.20", "port": 4747, "path": "/video"},
                               content_type="application/json")
         self.assertEqual(ok.status_code, 201)
         names = [c["name"] for c in self.client.get(url).json()["cameras"]]
