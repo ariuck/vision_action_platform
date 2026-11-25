@@ -17,7 +17,7 @@ class AIServiceError(Exception):
 
 
 def request_prediction(video_path: Path) -> dict:
-    url = f"{settings.AI_SERVICE_URL.rstrip('/')}/predict/video"
+    url = f"{settings.AI_SERVICE_URL.rstrip('/')}/api/v1/predict/"
     try:
         with open(video_path, "rb") as f:
             response = requests.post(url, files={"file": (video_path.name, f, "video/mp4")},

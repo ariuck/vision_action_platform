@@ -35,6 +35,8 @@ services:
     environment:
       MODEL_DIR: /app/models
       POSE_DEVICE: cpu
+    ports:
+      - "8001:8001"   # Swagger UI 확인용 (http://localhost:8001/docs)
     volumes:
       - ./ai_service/models:/app/models:ro   # 학습한 모델 파일 (Git에는 올리지 않음)
     healthcheck:

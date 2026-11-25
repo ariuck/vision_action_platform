@@ -2,8 +2,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 urlpatterns = [
+    path("", RedirectView.as_view(pattern_name="analyses:index", permanent=False)),  # 첫 화면 → /analyses/
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
     path("", include("analyses.urls")),

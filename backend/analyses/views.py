@@ -40,7 +40,7 @@ class AnalysisJobViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.
             transaction.on_commit(lambda: self._enqueue(job.pk))
         job.refresh_from_db()
         return Response({"id": job.pk, "status": job.status, "celery_task_id": job.celery_task_id,
-                         "status_url": f"/api/analyses/{job.pk}/status/"}, status=status.HTTP_202_ACCEPTED)
+                         "status_url": f"/api/v1/analyses/{job.pk}/status/"}, status=status.HTTP_202_ACCEPTED)
 
     @staticmethod
     def _enqueue(job_id: int) -> None:

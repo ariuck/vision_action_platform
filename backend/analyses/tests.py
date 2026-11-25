@@ -59,40 +59,40 @@ class AnalysisApiTests(TestCase):
 
     # 로그인하지 않으면 API를 쓸 수 없다
     def test_anonymous_is_rejected(self):
-        res = self.client.get("/api/analyses/")
+        res = self.client.get("/api/v1/analyses/")
         self.assertIn(res.status_code, (401, 403))
 
     # 업로드하면 202와 작업 ID를 바로 받고, 커밋 뒤 Celery 작업이 등록된다
     def test_create_upload_returns_202_and_enqueues(self):
         self.client.force_authenticate(self.alice)
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post("/api/analyses/", {"input_type": "UPLOAD", "title": "테스트",
+            res = self.client.post("/api/v1/analyses/", {"input_type": "UPLOAD", "title": "테스트",
                                                       "video_file": video()}, format="multipart")
         self.assertEqual(res.status_code, 202)
         job = AnalysisJob.objects.get(pk=res.data["id"])
         self.assertEqual(job.status, "PENDING")
         self.assertEqual(job.celery_task_id, "task-123")
         self.delay.assert_called_once_with(job.pk)
-        self.assertEqual(res.data["status_url"], f"/api/analyses/{job.pk}/status/")
+        self.assertEqual(res.data["status_url"], f"/api/v1/analyses/{job.pk}/status/")
 
     def test_upload_rejects_wrong_extension(self):
         self.client.force_authenticate(self.alice)
-        res = self.client.post("/api/analyses/", {"input_type": "UPLOAD", "video_file": video("a.txt")},
+        res = self.client.post("/api/v1/analyses/", {"input_type": "UPLOAD", "video_file": video("a.txt")},
                                format="multipart")
         self.assertEqual(res.status_code, 400)
         self.assertIn("video_file", res.data)
 
     def test_upload_requires_file(self):
         self.client.force_authenticate(self.alice)
-        res = self.client.post("/api/analyses/", {"input_type": "UPLOAD"}, format="multipart")
+        res = self.client.post("/api/v1/analyses/", {"input_type": "UPLOAD"}, format="multipart")
         self.assertEqual(res.status_code, 400)
 
     def test_camera_must_be_whitelisted(self):
         self.client.force_authenticate(self.alice)
-        bad = self.client.post("/api/analyses/", {"input_type": "CAMERA", "camera_name": "http://1.2.3.4"})
+        bad = self.client.post("/api/v1/analyses/", {"input_type": "CAMERA", "camera_name": "http://1.2.3.4"})
         self.assertEqual(bad.status_code, 400)
         with self.captureOnCommitCallbacks(execute=True):
-            ok = self.client.post("/api/analyses/", {"input_type": "CAMERA", "camera_name": "phone"})
+            ok = self.client.post("/api/v1/analyses/", {"input_type": "CAMERA", "camera_name": "phone"})
         self.assertEqual(ok.status_code, 202)
 
     # Redis가 꺼져 있으면 작업을 FAILURE로 남긴다
@@ -100,7 +100,7 @@ class AnalysisApiTests(TestCase):
         self.delay.side_effect = ConnectionError("redis down")
         self.client.force_authenticate(self.alice)
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post("/api/analyses/", {"input_type": "UPLOAD", "video_file": video()},
+            res = self.client.post("/api/v1/analyses/", {"input_type": "UPLOAD", "video_file": video()},
                                    format="multipart")
         job = AnalysisJob.objects.get(pk=res.data["id"])
         self.assertEqual(job.status, "FAILURE")
@@ -111,23 +111,23 @@ class AnalysisApiTests(TestCase):
         mine = self.make_job(self.alice)
         other = self.make_job(self.bob)
         self.client.force_authenticate(self.alice)
-        ids = [j["id"] for j in self.client.get("/api/analyses/").data["results"]]
+        ids = [j["id"] for j in self.client.get("/api/v1/analyses/").data["results"]]
         self.assertEqual(ids, [mine.pk])
-        self.assertEqual(self.client.get(f"/api/analyses/{other.pk}/").status_code, 404)
-        self.assertEqual(self.client.patch(f"/api/analyses/{other.pk}/", {"title": "x"}).status_code, 404)
-        self.assertEqual(self.client.delete(f"/api/analyses/{other.pk}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/v1/analyses/{other.pk}/").status_code, 404)
+        self.assertEqual(self.client.patch(f"/api/v1/analyses/{other.pk}/", {"title": "x"}).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/v1/analyses/{other.pk}/").status_code, 404)
 
     def test_staff_sees_all_jobs(self):
         self.make_job(self.alice)
         self.make_job(self.bob)
         self.client.force_authenticate(self.admin)
-        self.assertEqual(self.client.get("/api/analyses/").data["count"], 2)
+        self.assertEqual(self.client.get("/api/v1/analyses/").data["count"], 2)
 
     # PATCH는 제목·메모만 바뀌고 상태는 바뀌지 않는다
     def test_patch_changes_only_title_and_memo(self):
         job = self.make_job(self.alice)
         self.client.force_authenticate(self.alice)
-        res = self.client.patch(f"/api/analyses/{job.pk}/", {"title": "새 제목", "memo": "메모",
+        res = self.client.patch(f"/api/v1/analyses/{job.pk}/", {"title": "새 제목", "memo": "메모",
                                                              "status": "SUCCESS"}, format="json")
         self.assertEqual(res.status_code, 200)
         job.refresh_from_db()
@@ -136,7 +136,7 @@ class AnalysisApiTests(TestCase):
     def test_status_endpoint(self):
         job = self.make_job(self.alice)
         self.client.force_authenticate(self.alice)
-        res = self.client.get(f"/api/analyses/{job.pk}/status/")
+        res = self.client.get(f"/api/v1/analyses/{job.pk}/status/")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["status"], "PENDING")
         self.assertFalse(res.data["is_finished"])
@@ -146,7 +146,7 @@ class AnalysisApiTests(TestCase):
         PersonPrediction.objects.create(job=job, track_id=1, action_id="A007", action_label="sit_floor",
                                         action_name="바닥에 앉기", confidence=0.7)
         self.client.force_authenticate(self.alice)
-        self.assertEqual(self.client.delete(f"/api/analyses/{job.pk}/").status_code, 204)
+        self.assertEqual(self.client.delete(f"/api/v1/analyses/{job.pk}/").status_code, 204)
         self.assertFalse(PersonPrediction.objects.exists())
 
 
@@ -302,6 +302,11 @@ class StatsTests(TestCase):
 
 
 class PageTests(TestCase):
+    def test_root_redirects_to_analyses(self):
+        # 교재 권장 주소: 사용자 분석 화면은 /analyses/
+        res = self.client.get("/")
+        self.assertEqual((res.status_code, res["Location"]), (302, "/analyses/"))
+
     def test_index_requires_login(self):
         res = self.client.get(reverse("analyses:index"))
         self.assertEqual(res.status_code, 302)

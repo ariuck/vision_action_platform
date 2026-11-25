@@ -115,6 +115,10 @@ form.inline { display: inline; }
 .nowrap { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 .table-wrap .table { min-width: 640px; }
+.side .table-wrap .table { min-width: 0; }  /* 오른쪽 좁은 칸의 결과 표는 칸 너비에 맞춤 */
+.table.result-table td small { white-space: normal; }
+.result-table th { white-space: nowrap; }
+.result-table td:first-child, .result-table th:first-child { width: 56px; }
 .table td small { white-space: nowrap; }
 @media (max-width: 800px) {
   .row, .grid2, .analysis-grid { grid-template-columns: 1fr; }

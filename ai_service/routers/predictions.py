@@ -1,4 +1,8 @@
-"""POST /predict/video — Celery Worker가 보낸 영상 1건을 받아 사람별 예측 JSON을 돌려준다."""
+"""POST /api/v1/predict/ — Celery Worker가 보낸 영상 1건을 받아 사람별 예측 JSON을 돌려준다.
+
+교재 권장 주소(/api/v1/predict/)를 기본으로 쓰고, 예전 주소 /predict/video도 같이 열어 둔다.
+Swagger 화면: http://localhost:8001/docs
+"""
 from __future__ import annotations
 
 import os
@@ -16,7 +20,8 @@ ALLOWED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_MB", "300")) * 1024 * 1024
 
 
-@router.post("/predict/video")
+@router.post("/api/v1/predict/", summary="영상 1개 → 사람(Track ID)별 동작 예측")
+@router.post("/predict/video", include_in_schema=False)
 async def predict_video_endpoint(request: Request, file: UploadFile = File(...)):
     bundle = getattr(request.app.state, "bundle", None)
     if bundle is None:

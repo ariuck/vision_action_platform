@@ -176,7 +176,7 @@
   camSelect.addEventListener("change", restartCamera);
 
   async function reloadCameras(select) {
-    const res = await api("/api/cameras/");
+    const res = await api("/api/v1/cameras/");
     if (!res.ok) return;
     const { cameras } = await res.json();
     camSelect.innerHTML = cameras.map((c) => `<option value="${esc(c.name)}">${esc(c.name)} · ${esc(c.address)}</option>`).join("");
@@ -191,7 +191,7 @@
   $("cam-add-btn").addEventListener("click", async () => {
     const body = { name: $("cam-new-name").value.trim(), ip: $("cam-new-ip").value.trim(),
                    port: $("cam-new-port").value, path: $("cam-new-path").value.trim() };
-    const res = await api("/api/cameras/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await api("/api/v1/cameras/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
     if (!res.ok) {
       $("cam-add-error").textContent = (data.errors || [data.detail]).join(" ");
@@ -205,7 +205,7 @@
   $("cam-del").addEventListener("click", async () => {
     const name = camSelect.value;
     if (!name || !confirm(`'${name}' 카메라 등록을 삭제할까요?`)) return;
-    const res = await api(`/api/cameras/${encodeURIComponent(name)}/`, { method: "DELETE" });
+    const res = await api(`/api/v1/cameras/${encodeURIComponent(name)}/`, { method: "DELETE" });
     if (res.ok) { await reloadCameras(); restartCamera(); }
   });
 
@@ -324,7 +324,7 @@
 
   async function poll(id) {
     while (true) {
-      const res = await api(`/api/analyses/${id}/status/`);
+      const res = await api(`/api/v1/analyses/${id}/status/`);
       if (!res.ok) return;
       const s = await res.json();
       setFlow(s.stage, s.input_type, s.error_code);
@@ -335,7 +335,7 @@
       if (s.is_finished) break;
       await sleep(POLL_MS);
     }
-    const job = await (await api(`/api/analyses/${id}/`)).json();
+    const job = await (await api(`/api/v1/analyses/${id}/`)).json();
     renderResult(job);
     startBtn.disabled = false;
     refreshHistory();
@@ -370,7 +370,7 @@
     const data = new FormData(form);
     if (mode === "CAMERA") data.delete("video_file");
     $("current-message").textContent = mode === "UPLOAD" ? "영상을 올리는 중…" : "작업을 등록하는 중…";
-    const res = await api("/api/analyses/", { method: "POST", body: data });
+    const res = await api("/api/v1/analyses/", { method: "POST", body: data });
     const body = await res.json();
     if (!res.ok) {
       $("current-message").textContent = "";
@@ -400,7 +400,7 @@
   }
 
   async function refreshHistory() {
-    const res = await api("/api/analyses/");
+    const res = await api("/api/v1/analyses/");
     if (!res.ok) return;
     const list = (await res.json()).results;
     $("history").querySelector("tbody").innerHTML = list.length
@@ -412,7 +412,7 @@
     const detailId = e.target.dataset.detail;
     const deleteId = e.target.dataset.delete;
     if (detailId) {
-      const job = await (await api(`/api/analyses/${detailId}/`)).json();
+      const job = await (await api(`/api/v1/analyses/${detailId}/`)).json();
       $("current-id").textContent = `#${detailId}`;
       setFlow(job.stage, job.input_type, job.error_code);
       $("current-message").textContent = job.message || "";
@@ -421,7 +421,7 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (deleteId && confirm(`#${deleteId} 분석 기록과 결과를 삭제할까요? 되돌릴 수 없습니다.`)) {
-      const res = await api(`/api/analyses/${deleteId}/`, { method: "DELETE" });
+      const res = await api(`/api/v1/analyses/${deleteId}/`, { method: "DELETE" });
       if (res.ok) refreshHistory();
     }
   });
