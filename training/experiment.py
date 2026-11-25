@@ -240,6 +240,15 @@ def main():
                     accs.append(accuracy_score(te.action_label, m.predict(te[FEATS].to_numpy(float))))
             print(f"  {k} → 30fps로 바꾼 영상 LOSO {np.mean(accs):.3f}")
         show(res, "fps30_compare")
+    elif stage == "yscale":   # 카메라 높이 흉내 증강 (세로 0.85·1.15배)
+        model = MODELS["ExtraTrees 500·특징10%"]
+        base = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad"]
+        res = {"A6 (지금)": evaluate_seeds(model, base), "A6 + 세로 누르기·늘리기": evaluate_seeds(model, base + ["ysquash", "ystretch"])}
+        for k, r in res.items():
+            print(f"{k}: LOSO {r['loso_acc']:.3f} 최저 {r['loso_min']:.3f} 외부 {r['ext_acc']:.2f} "
+                  f"(새 영상 {r['ext_new5']:.2f}, 웹캠 {r['ext_webcam5']:.2f}) 정답확률 {r['ext_true_p']:.3f}")
+        df, pa, det = show(res, "yscale_compare")
+        print(det.to_string())
     elif stage == "tta":    # 예측할 때 증강 비교 (모델·학습 증강은 고정)
         augs = sys.argv[sys.argv.index("--augs") + 1].split(",")
         model = sys.argv[sys.argv.index("--model") + 1]

@@ -13,6 +13,7 @@
 - rot±    : 화면을 ±7도 기울임 — 카메라가 살짝 기울어진 경우
 - pad     : 앞뒤에 1.5~3초 서 있는 Frame 추가 (잡음 포함) — 카메라 녹화처럼 서 있는 시간이 긴 경우
 - fps30   : 한 Frame 건너 하나씩 → 30fps 영상 흉내 (학습 영상은 전부 60fps)
+- ysquash/ystretch: 골반 높이 기준으로 세로 0.85배 / 1.15배 — 카메라를 높이 달거나 낮게 단 경우
 """
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ from src.pose_utils import COCO_KEYPOINT_NAMES  # noqa: E402
 TRAIN_REPO = Path.home() / "ai_vision/subject10_pose_action"
 MANIFEST = TRAIN_REPO / "data/team_projects/team03/manifests/keypoint_dataset_manifest.csv"
 FLIP_PAIRS = [(1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16)]
-AUGS = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad", "fps30"]
+AUGS = ["orig", "hflip", "fast", "slow", "jitter", "rot+", "rot-", "pad", "fps30", "ysquash", "ystretch"]
 
 
 def track_from_csv(path: Path) -> tuple[Track, float]:
@@ -88,6 +89,16 @@ def augment(tr: Track, fps: float, kind: str, width: float, seed: int) -> tuple[
             x1, y1, x2, y2 = t.boxes[i]
             corners = (np.array([[x1, y1], [x2, y1], [x1, y2], [x2, y2]]) - center) @ r.T + center
             t.boxes[i] = np.array([*corners.min(0), *corners.max(0)])
+        return t, fps
+    if kind in ("ysquash", "ystretch"):   # 카메라 높이 흉내: 위에서 내려다보면 몸이 세로로 눌려 보인다
+        sy = 0.85 if kind == "ysquash" else 1.15
+        cy = float(np.nanmedian(np.stack([k[[11, 12], 1].mean() for k in t.keypoints])))
+        for i in range(len(t.keypoints)):
+            k = t.keypoints[i].copy()
+            k[:, 1] = cy + (k[:, 1] - cy) * sy
+            t.keypoints[i] = k
+            x1, y1, x2, y2 = t.boxes[i]
+            t.boxes[i] = np.array([x1, cy + (y1 - cy) * sy, x2, cy + (y2 - cy) * sy])
         return t, fps
     if kind == "fps30":   # 60fps 학습 영상을 한 Frame 건너 하나씩 → 30fps 카메라·휴대폰 영상 흉내
         new = Track(1)

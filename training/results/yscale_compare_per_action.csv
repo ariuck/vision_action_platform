@@ -1,0 +1,18 @@
+﻿,A6 (지금),A6 + 세로 누르기·늘리기
+body_slam,1.0,1.0
+crouch_take_item,0.933,0.911
+fall_backward,0.933,0.933
+fall_forward,0.956,0.978
+fall_sideways,0.511,0.467
+front_kick,0.933,0.933
+grab_shake,0.556,0.6
+kiosk_tap,0.844,0.822
+lie_backward,0.978,1.0
+lie_forward,0.8,0.8
+push,0.733,0.644
+shotgun,0.867,0.867
+sit_floor,1.0,1.0
+sit_on_object,1.0,1.0
+swing,1.0,0.978
+throw_one_hand,0.933,0.933
+vomit,1.0,1.0
